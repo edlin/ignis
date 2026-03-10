@@ -10,6 +10,16 @@ function normPath(p) {
   return (p || "").replace(/^\/+/, "");
 }
 
+// Convert a Uint8Array to base64 without blowing the stack
+function uint8ToBase64(bytes) {
+  let binary = "";
+  const chunk = 8192;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+  }
+  return btoa(binary);
+}
+
 async function request(method, endpoint, params = {}) {
   const url = new URL(API_BASE + endpoint, window.location.origin);
 
@@ -109,7 +119,7 @@ export const transport = {
     const isText = typeof content === "string";
     return requestJson("POST", "/writeFile", {
       path: normPath(path),
-      content: isText ? content : btoa(String.fromCharCode(...content)),
+      content: isText ? content : uint8ToBase64(content),
       encoding: encoding || (isText ? "utf-8" : "binary"),
       base64: !isText,
     });
@@ -197,7 +207,7 @@ export const transport = {
     const isText = typeof content === "string";
     requestSync("POST", "/writeFile", {
       path: normPath(path),
-      content: isText ? content : btoa(String.fromCharCode(...content)),
+      content: isText ? content : uint8ToBase64(content),
       encoding: encoding || (isText ? "utf-8" : "binary"),
       base64: !isText,
     });

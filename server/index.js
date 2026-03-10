@@ -36,6 +36,9 @@ const vaultRoutes = require("./routes/vault");
 app.use("/api/fs", fsRoutes);
 app.use("/api/vault", vaultRoutes);
 
+// Serve vault files for resource URLs (images, attachments, etc.)
+app.use("/vault-files", express.static(config.vaultPath));
+
 // --- Static serving ---
 // Serve the built shim-loader.js
 app.use(

@@ -25,7 +25,7 @@ const syncHandlers = {
   vault: () => window.__vaultConfig || { id: "default-vault", path: "/" },
   version: () => "1.8.9",
   "is-dev": () => false,
-  "file-url": () => "",
+  "file-url": () => "/vault-files/",
   "disable-update": () => true,
   update: () => "",
   "disable-gpu": () => false,
@@ -49,7 +49,20 @@ const syncHandlers = {
 export const ipcRenderer = {
   send(channel, ...args) {
     console.log("[shim:ipcRenderer] send:", channel, args);
-    // TODO: route to server via chosen sync mechanism if needed
+
+    // context-menu: Obsidian sends this and waits (up to 1s) for a response.
+    // In Electron, the main process returns spell-check info + edit flags.
+    // We reply immediately with a response object so Obsidian proceeds to
+    // build and show its HTML context menu without delay.
+    if (channel === "context-menu") {
+      queueMicrotask(() =>
+        ipcRenderer._emit("context-menu", {
+          webContentsId: 1,
+          editFlags: { canCut: true, canCopy: true, canPaste: true },
+        }),
+      );
+      return;
+    }
   },
 
   sendSync(channel, ...args) {

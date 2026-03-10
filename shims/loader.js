@@ -119,6 +119,19 @@ window.close = function () {
   console.log("[obsidian-bridge] window.close() blocked");
 };
 
+// Suppress the browser's native context menu without breaking Obsidian's.
+// Problem: preventDefault() blocks the browser menu but also sets
+// event.defaultPrevented=true, which Obsidian checks to bail out.
+// Solution: call preventDefault() then shadow defaultPrevented to return false.
+window.addEventListener(
+  "contextmenu",
+  (e) => {
+    e.preventDefault();
+    Object.defineProperty(e, "defaultPrevented", { get: () => false });
+  },
+  true,
+);
+
 // Pre-populate fs metadata cache synchronously before app.js runs.
 // This ensures existsSync() works for the vault path during startup.
 (function initMetadataCache() {

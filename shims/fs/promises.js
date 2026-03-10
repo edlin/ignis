@@ -24,19 +24,38 @@ export function createFsPromises(metadataCache, contentCache, transport) {
       if (meta && meta.type === "file") {
         return [];
       }
+      // If path not in cache at all (and not root), it doesn't exist
+      if (!meta && path && path !== "/" && path !== ".") {
+        const e = new Error(
+          `ENOENT: no such file or directory, scandir '${path}'`,
+        );
+        e.code = "ENOENT";
+        throw e;
+      }
       // Serve from metadata cache
       const entries = metadataCache.readdir(path);
-      if (entries.length > 0) {
-        return entries.map((e) => e.name);
-      }
-      // Fallback to server
-      const serverEntries = await transport.readdir(path);
-      return serverEntries.map((e) => e.name);
+      return entries.map((e) => e.name);
     },
 
     async readFile(path, encoding) {
       if (typeof encoding === "object") encoding = encoding?.encoding;
       const wantText = encoding === "utf8" || encoding === "utf-8";
+
+      // Short-circuit: reading a directory is an error
+      const meta = metadataCache.get(path);
+      if (meta && meta.type === "directory") {
+        const e = new Error("EISDIR: illegal operation on a directory, read");
+        e.code = "EISDIR";
+        throw e;
+      }
+      // Short-circuit: file not in metadata cache → doesn't exist
+      if (!meta && path) {
+        const e = new Error(
+          `ENOENT: no such file or directory, open '${path}'`,
+        );
+        e.code = "ENOENT";
+        throw e;
+      }
 
       // Check content cache
       const cached = contentCache.get(path);
@@ -142,7 +161,11 @@ export function createFsPromises(metadataCache, contentCache, transport) {
 
     async access(path) {
       if (metadataCache.has(path)) return;
-      await transport.access(path);
+      const e = new Error(
+        `ENOENT: no such file or directory, access '${path}'`,
+      );
+      e.code = "ENOENT";
+      throw e;
     },
 
     async realpath(path) {

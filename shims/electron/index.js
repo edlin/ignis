@@ -10,6 +10,13 @@ export const electronShim = {
   webFrame,
   remote: remoteShim,
 
+  // electron.webUtils  -  used for drag/drop file path extraction (desktop only)
+  webUtils: {
+    getPathForFile(file) {
+      return "";
+    },
+  },
+
   // electron.deprecate  -  used by Obsidian to mark deprecated APIs
   deprecate: {
     function(fn, name) {

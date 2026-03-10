@@ -135,6 +135,7 @@ const currentWindow = {
 };
 
 const currentWebContents = {
+  id: 1,
   _zoomLevel: 0,
 
   get zoomLevel() {
@@ -182,7 +183,25 @@ const currentWebContents = {
 
   undo() {},
   redo() {},
-  pasteAndMatchStyle() {},
+  cut() {
+    document.execCommand("cut");
+  },
+  copy() {
+    document.execCommand("copy");
+  },
+  paste() {
+    document.execCommand("paste");
+  },
+  pasteAndMatchStyle() {
+    document.execCommand("paste");
+  },
+  replaceMisspelling(word) {},
+
+  session: {
+    availableSpellCheckerLanguages: [],
+    setSpellCheckerLanguages(langs) {},
+    addWordToSpellCheckerDictionary(word) {},
+  },
 
   setSpellCheckerLanguages(langs) {},
 
@@ -212,4 +231,7 @@ export const windowShim = {
 
 export const webContentsShim = {
   _current: () => currentWebContents,
+  fromId(id) {
+    return id === currentWebContents.id ? currentWebContents : null;
+  },
 };
