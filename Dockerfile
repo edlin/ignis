@@ -52,11 +52,11 @@ COPY server/ ./server/
 COPY --from=build /build/obsidian-app ./obsidian-app
 
 ENV PORT=8080
-ENV VAULT_PATH=/vault
+ENV VAULT_ROOT=/vaults
 ENV OBSIDIAN_ASSETS_PATH=/app/obsidian-app
 
 EXPOSE 8080
 
-VOLUME /vault
+VOLUME /vaults
 
 CMD ["node", "server/index.js"]
