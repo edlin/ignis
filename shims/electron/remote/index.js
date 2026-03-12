@@ -25,6 +25,17 @@ export const remoteShim = {
   screen: screenShim,
   nativeImage: nativeImageShim,
   Notification: notificationShim,
+  safeStorage: {
+    isEncryptionAvailable() {
+      return false;
+    },
+    encryptString(plainText) {
+      return Buffer.from(plainText);
+    },
+    decryptString(encrypted) {
+      return encrypted.toString();
+    },
+  },
 
   getCurrentWindow() {
     return windowShim._current();

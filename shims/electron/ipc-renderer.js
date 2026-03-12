@@ -4,7 +4,7 @@ const listeners = new Map();
 
 const syncHandlers = {
   vault: () => window.__vaultConfig || { id: "default-vault", path: "/" },
-  version: () => "1.8.9",
+  version: () => window.__obsidianVersion || "0.0.0",
   "is-dev": () => false,
   "file-url": () =>
     "/vault-files/" + encodeURIComponent(window.__currentVaultId || "") + "/",

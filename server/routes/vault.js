@@ -28,7 +28,7 @@ router.get("/info", (req, res) => {
     name: vaultId,
     path: vaultPath,
     platform: process.platform,
-    version: "0.1.0",
+    version: config.obsidianVersion,
   });
 });
 

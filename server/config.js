@@ -64,4 +64,18 @@ module.exports = {
   obsidianAssetsPath:
     process.env.OBSIDIAN_ASSETS_PATH ||
     path.join(__dirname, "..", "investigation", "obsidian.asar.unpacked"),
+
+  get obsidianVersion() {
+    const assetsPath =
+      process.env.OBSIDIAN_ASSETS_PATH ||
+      path.join(__dirname, "..", "investigation", "obsidian.asar.unpacked");
+    try {
+      const pkg = JSON.parse(
+        fs.readFileSync(path.join(assetsPath, "package.json"), "utf-8"),
+      );
+      return pkg.version || "0.0.0";
+    } catch {
+      return "0.0.0";
+    }
+  },
 };

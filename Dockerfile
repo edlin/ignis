@@ -33,7 +33,7 @@ RUN chmod +x /app/scripts/entrypoint.sh
 
 ENV PORT=8080
 ENV VAULT_ROOT=/vaults
-ENV OBSIDIAN_VERSION=1.8.9
+ENV OBSIDIAN_VERSION=1.12.4
 ENV OBSIDIAN_ASSETS_PATH=/app/obsidian-app
 
 EXPOSE 8080

@@ -12,7 +12,7 @@ export const appShim = {
   },
 
   getVersion() {
-    return "1.8.9";
+    return window.__obsidianVersion || "0.0.0";
   },
 
   getName() {

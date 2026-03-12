@@ -141,11 +141,16 @@ window.__currentVaultId = _urlParams.get("vault") || "";
     if (xhr.status === 200) {
       const info = JSON.parse(xhr.responseText);
       window.__currentVaultId = info.id;
+      window.__obsidianVersion = info.version || "0.0.0";
       window.__vaultConfig = {
         id: info.id,
         path: "/",
       };
       console.log("[obsidian-bridge] Vault:", window.__vaultConfig);
+      console.log(
+        "[obsidian-bridge] Obsidian version:",
+        window.__obsidianVersion,
+      );
     } else {
       console.warn("[obsidian-bridge] No vault found, will show manager");
     }
