@@ -27,6 +27,7 @@ RUN npm ci --omit=dev --ignore-scripts
 COPY server/ ./server/
 COPY scripts/ ./scripts/
 COPY images/ ./images/
+COPY plugin/ ./plugin/
 COPY --from=build /build/dist ./dist
 
 RUN chmod +x /app/scripts/entrypoint.sh

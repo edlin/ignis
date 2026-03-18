@@ -52,6 +52,31 @@ router.post("/create", async (req, res) => {
       recursive: false,
     });
 
+    // Install ignis-bridge plugin
+    const pluginDir = path.join(
+      vaultPath,
+      ".obsidian",
+      "plugins",
+      "ignis-bridge",
+    );
+    await fs.promises.mkdir(pluginDir, { recursive: true });
+
+    const pluginSrcDir = path.join(__dirname, "..", "..", "plugin");
+    await fs.promises.copyFile(
+      path.join(pluginSrcDir, "manifest.json"),
+      path.join(pluginDir, "manifest.json"),
+    );
+    await fs.promises.copyFile(
+      path.join(pluginSrcDir, "main.js"),
+      path.join(pluginDir, "main.js"),
+    );
+
+    // Enable the plugin
+    await fs.promises.writeFile(
+      path.join(vaultPath, ".obsidian", "community-plugins.json"),
+      JSON.stringify(["ignis-bridge"]),
+    );
+
     config.refreshVaults();
 
     res.json({ ok: true, id: name, path: vaultPath });

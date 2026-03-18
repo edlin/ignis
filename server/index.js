@@ -2,6 +2,7 @@ const express = require("express");
 const path = require("path");
 const config = require("./config");
 const { setupWebSocket } = require("./ws");
+const { installPluginInAllVaults } = require("./install-plugin");
 
 const ANSI_RED = "\x1b[31m";
 const ANSI_YELLOW = "\x1b[33m";
@@ -73,10 +74,12 @@ app.use(express.static(path.join(__dirname, "..", "dist")));
 
 app.use(express.static(config.obsidianAssetsPath));
 
-const server = app.listen(config.port, () => {
+const server = app.listen(config.port, async () => {
   console.log(`[ignis] Server running on http://localhost:${config.port}`);
   console.log(`[ignis] Vault root: ${config.vaultRoot}`);
   console.log(`[ignis] Vaults: ${Object.keys(config.vaults).join(", ")}`);
+
+  await installPluginInAllVaults(config.vaultRoot);
 });
 
 setupWebSocket(server);

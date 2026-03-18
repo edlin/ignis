@@ -1,0 +1,10 @@
+{
+  "id": "ignis-bridge",
+  "name": "Ignis Bridge",
+  "version": "1.0.0",
+  "minAppVersion": "1.0.0",
+  "description": "Upload files from your device to the vault",
+  "author": "Ignis",
+  "authorUrl": "https://github.com/Nystik-gh/ignis",
+  "isDesktopOnly": false
+}
