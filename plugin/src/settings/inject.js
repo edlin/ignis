@@ -21,7 +21,7 @@ function createNavEl(tab, setting) {
   return nav;
 }
 
-function createTab(id, name, displayFn) {
+function createTab(id, name, displayFn, app) {
   const tab = {
     id,
     name,
@@ -30,7 +30,7 @@ function createTab(id, name, displayFn) {
 
     display() {
       this.containerEl.empty();
-      displayFn(this.containerEl);
+      displayFn(this.containerEl, app);
     },
 
     hide() {
@@ -41,7 +41,7 @@ function createTab(id, name, displayFn) {
   return tab;
 }
 
-function injectIgnisSettings(setting) {
+function injectIgnisSettings(setting, app) {
   const group = document.createElement("div");
   group.className = "vertical-tab-header-group";
 
@@ -55,8 +55,8 @@ function injectIgnisSettings(setting) {
   group.appendChild(items);
 
   const tabs = [
-    createTab("ignis-general", "General", generalTab.display),
-    createTab("ignis-server-plugins", "Server Plugins", serverPluginsTab.display),
+    createTab("ignis-general", "General", generalTab.display, app),
+    createTab("ignis-server-plugins", "Server Plugins", serverPluginsTab.display, app),
   ];
 
   for (const tab of tabs) {
@@ -69,11 +69,12 @@ function injectIgnisSettings(setting) {
 
 function patchSettingsModal(plugin) {
   const original = plugin.app.setting.onOpen;
+  const app = plugin.app;
   plugin._originalOnOpen = original;
 
   plugin.app.setting.onOpen = function () {
     original.call(this);
-    injectIgnisSettings(this);
+    injectIgnisSettings(this, app);
   };
 }
 

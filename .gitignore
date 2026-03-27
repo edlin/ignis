@@ -2,3 +2,4 @@ node_modules/
 dist/
 investigation/
 vaults/
+plugin/main.js
