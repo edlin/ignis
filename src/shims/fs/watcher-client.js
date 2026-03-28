@@ -70,6 +70,11 @@ export function createWatcherClient(metadataCache, contentCache, fsWatch) {
   }
 
   function handleEvent(msg) {
+    // Skip channel-based plugin messages, those are for other listeners
+    if (msg.channel) {
+      return;
+    }
+
     const { type, path, stat } = msg;
 
     if (!type || !path) return;
