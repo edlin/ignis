@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.1] - Orm (2026-03-29)
+
+### Added
+
+- Server plugin system
+- obsidian-headless integration via server plugin
+
 ## [0.6.4] - Slifer (2026-03-24)
 
 ### Added
