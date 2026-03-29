@@ -1,7 +1,6 @@
-const { spawn } = require("child_process");
 const fs = require("fs");
 const path = require("path");
-const os = require("os");
+const { spawnOb } = require("./ob-cli");
 
 const MAX_LOG_ENTRIES = 200;
 
@@ -28,6 +27,7 @@ class SyncManager {
           vaultId: entry.vaultId,
           vaultPath,
           remoteVault: entry.remoteVault,
+          remoteVaultName: entry.remoteVaultName || null,
           status: "stopped",
           pid: null,
           lastActivity: new Date().toISOString(),
@@ -56,6 +56,7 @@ class SyncManager {
         vaultId: state.vaultId,
         vaultPath: state.vaultPath,
         remoteVault: state.remoteVault,
+        remoteVaultName: state.remoteVaultName,
         config: state.config,
         autoStart: state.autoStart,
       });
@@ -83,6 +84,7 @@ class SyncManager {
       vaultId,
       vaultPath,
       remoteVault,
+      remoteVaultName: options.remoteVaultName || null,
       status: "stopped",
       pid: null,
       lastActivity: new Date().toISOString(),
@@ -123,10 +125,7 @@ class SyncManager {
       args.push("--mirror-remote");
     }
 
-    const proc = spawn("ob", args, {
-      cwd: state.vaultPath,
-      env: { ...process.env, HOME: os.homedir() },
-    });
+    const proc = spawnOb(args, { cwd: state.vaultPath });
 
     state.status = "running";
     state.pid = proc.pid;
@@ -214,6 +213,22 @@ class SyncManager {
     return this.getState(vaultId);
   }
 
+  unlinkVault(vaultId) {
+    const state = this.states.get(vaultId);
+
+    if (!state) {
+      throw new Error(`No sync configuration for vault: ${vaultId}`);
+    }
+
+    if (state._process) {
+      state._process.kill("SIGTERM");
+    }
+
+    this.states.delete(vaultId);
+    this.saveStates();
+    this.ctx.log(`Unlinked vault ${vaultId}`);
+  }
+
   getState(vaultId) {
     const state = this.states.get(vaultId);
 
@@ -224,6 +239,7 @@ class SyncManager {
     return {
       vaultId: state.vaultId,
       remoteVault: state.remoteVault,
+      remoteVaultName: state.remoteVaultName,
       status: state.status,
       pid: state.pid,
       lastActivity: state.lastActivity,

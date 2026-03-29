@@ -12,8 +12,6 @@ class HeadlessSyncSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
 
-    containerEl.createEl("h2", { text: "Headless Sync" });
-
     let serverStatus;
 
     try {
@@ -35,10 +33,7 @@ class HeadlessSyncSettingTab extends PluginSettingTab {
     }
 
     this.renderAuthSection(containerEl, serverStatus);
-
-    if (serverStatus.authenticated) {
-      await this.renderSyncSection(containerEl);
-    }
+    await this.renderSyncSection(containerEl, serverStatus.authenticated);
   }
 
   renderAuthSection(containerEl, serverStatus) {
@@ -52,18 +47,17 @@ class HeadlessSyncSettingTab extends PluginSettingTab {
           `Signed in as ${serverStatus.name || "unknown"} (${serverStatus.email || "unknown"})`,
         )
         .addButton((btn) => {
-          btn
-            .setButtonText("Disconnect")
-            .setWarning()
-            .onClick(async () => {
-              try {
-                await api.logout();
-                new Notice("Disconnected from Headless Sync");
-                this.display();
-              } catch (e) {
-                new Notice(`Failed to disconnect: ${e.message}`);
-              }
-            });
+          btn.setButtonText("Disconnect");
+          btn.buttonEl.addClass("mod-destructive");
+          btn.onClick(async () => {
+            try {
+              await api.logout();
+              new Notice("Disconnected from Headless Sync");
+              this.display();
+            } catch (e) {
+              new Notice(`Failed to disconnect: ${e.message}`);
+            }
+          });
         });
     } else if (localToken) {
       // State B: signed into Obsidian, not connected to server
@@ -111,7 +105,21 @@ class HeadlessSyncSettingTab extends PluginSettingTab {
     }
   }
 
-  async renderSyncSection(containerEl) {
+  async renderSyncSection(containerEl, authenticated) {
+    containerEl.createEl("h3", { text: "Vault sync" });
+
+    if (!authenticated) {
+      new Setting(containerEl)
+        .setName("Sync not configured")
+        .setDesc("Sign in to your Obsidian Sync account to set up sync.")
+        .addButton((btn) => {
+          btn.setButtonText("Set up sync");
+          btn.buttonEl.disabled = true;
+        });
+
+      return;
+    }
+
     const vaultId = this.app.vault.getName();
 
     let vaultsData;
@@ -128,8 +136,6 @@ class HeadlessSyncSettingTab extends PluginSettingTab {
 
     const vaultState = vaultsData.vaults.find((v) => v.vaultId === vaultId);
 
-    containerEl.createEl("h3", { text: "Vault sync" });
-
     if (!vaultState) {
       new Setting(containerEl)
         .setName("Sync not configured")
@@ -139,7 +145,30 @@ class HeadlessSyncSettingTab extends PluginSettingTab {
             .setButtonText("Set up sync")
             .setCta()
             .onClick(() => {
-              new Notice("Vault picker coming soon.");
+              const scope = this.app.setting.scope;
+              const prevFocusContainer = scope.tabFocusContainerEl;
+              scope.tabFocusContainerEl = null;
+
+              const cleanup = () => {
+                scope.tabFocusContainerEl = prevFocusContainer;
+              };
+
+              const modal = new window.IgnisUI.SyncSetupModal({
+                target: document.body,
+                props: {
+                  vaultId,
+                  onSuccess: () => {
+                    cleanup();
+                    modal.$destroy();
+                    this.display();
+                  },
+                },
+              });
+
+              modal.$on("close", () => {
+                cleanup();
+                modal.$destroy();
+              });
             });
         });
 
@@ -149,7 +178,20 @@ class HeadlessSyncSettingTab extends PluginSettingTab {
     // Show current sync config
     new Setting(containerEl)
       .setName("Remote vault")
-      .setDesc(vaultState.remoteVault || "unknown");
+      .setDesc(vaultState.remoteVaultName || vaultState.remoteVault || "unknown")
+      .addButton((btn) => {
+        btn.setButtonText("Unlink");
+        btn.buttonEl.addClass("mod-destructive");
+        btn.onClick(async () => {
+          try {
+            await api.unlinkVault(vaultId);
+            new Notice("Vault unlinked");
+            this.display();
+          } catch (e) {
+            new Notice(`Failed to unlink: ${e.message}`);
+          }
+        });
+      });
 
     new Setting(containerEl)
       .setName("Sync mode")
@@ -168,7 +210,9 @@ class HeadlessSyncSettingTab extends PluginSettingTab {
       .setDesc(statusText)
       .addButton((btn) => {
         if (vaultState.status === "running") {
-          btn.setButtonText("Stop sync").setWarning().onClick(async () => {
+          btn.setButtonText("Stop sync");
+          btn.buttonEl.addClass("mod-destructive");
+          btn.onClick(async () => {
             try {
               await api.stopSync(vaultId);
               new Notice("Sync stopped");

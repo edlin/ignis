@@ -3,3 +3,4 @@ dist/
 investigation/
 vaults/
 plugin/main.js
+server/plugins/*/plugin/main.js

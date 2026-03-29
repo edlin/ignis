@@ -39,12 +39,20 @@ function setupSync(vaultId, remoteVault, opts = {}) {
   return post("/setup", { vaultId, remoteVault, ...opts });
 }
 
+function createRemoteVault(name, encryption, password, region) {
+  return post("/create-remote-vault", { name, encryption, password, region });
+}
+
 function startSync(vaultId) {
   return post("/start", { vaultId });
 }
 
 function stopSync(vaultId) {
   return post("/stop", { vaultId });
+}
+
+function unlinkVault(vaultId) {
+  return post("/unlink", { vaultId });
 }
 
 function getVaults() {
@@ -61,8 +69,10 @@ module.exports = {
   logout,
   getRemoteVaults,
   setupSync,
+  createRemoteVault,
   startSync,
   stopSync,
+  unlinkVault,
   getVaults,
   getLogs,
 };

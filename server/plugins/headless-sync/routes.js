@@ -49,7 +49,7 @@ function mountRoutes(router, plugin) {
   router.post("/setup", async (req, res) => {
     const ctx = plugin.getCtx();
     const syncManager = plugin.getSyncManager();
-    const { vaultId, remoteVault, vaultPassword, deviceName, mode } = req.body;
+    const { vaultId, remoteVault, remoteVaultName, vaultPassword, deviceName, mode } = req.body;
 
     if (!vaultId || !remoteVault) {
       return res.status(400).json({ error: "vaultId and remoteVault are required" });
@@ -67,6 +67,7 @@ function mountRoutes(router, plugin) {
 
     try {
       const state = await syncManager.setupSync(vaultId, vaultPath, remoteVault, {
+        remoteVaultName,
         vaultPassword,
         deviceName,
         mode,
@@ -115,6 +116,24 @@ function mountRoutes(router, plugin) {
     }
   });
 
+  router.post("/unlink", (req, res) => {
+    const ctx = plugin.getCtx();
+    const syncManager = plugin.getSyncManager();
+    const { vaultId } = req.body;
+
+    if (!vaultId) {
+      return res.status(400).json({ error: "vaultId is required" });
+    }
+
+    try {
+      syncManager.unlinkVault(vaultId);
+      res.json({ success: true });
+    } catch (e) {
+      ctx.log(`Failed to unlink vault: ${e.message}`);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   router.get("/logs", (req, res) => {
     const syncManager = plugin.getSyncManager();
     const { vaultId, limit } = req.query;
@@ -130,6 +149,42 @@ function mountRoutes(router, plugin) {
   router.get("/vaults", (req, res) => {
     const syncManager = plugin.getSyncManager();
     res.json({ vaults: syncManager.getAllStates() });
+  });
+
+  router.post("/create-remote-vault", async (req, res) => {
+    const ctx = plugin.getCtx();
+    const { name, encryption, password, region } = req.body;
+
+    if (!name) {
+      return res.status(400).json({ error: "name is required" });
+    }
+
+    if (!auth.isAuthenticated(ctx.dataDir)) {
+      return res.status(401).json({ error: "Not authenticated" });
+    }
+
+    const args = ["sync-create-remote", "--name", name];
+
+    if (encryption) {
+      args.push("--encryption", encryption);
+    }
+
+    if (password) {
+      args.push("--password", password);
+    }
+
+    if (region) {
+      args.push("--region", region);
+    }
+
+    try {
+      await obCli.runCommand(args);
+      ctx.log(`Created remote vault: ${name}`);
+      res.json({ success: true });
+    } catch (e) {
+      ctx.log(`Failed to create remote vault: ${e.message}`);
+      res.status(500).json({ error: e.message });
+    }
   });
 
   router.get("/remote-vaults", async (req, res) => {
@@ -162,10 +217,10 @@ function parseRemoteVaults(stdout) {
     }
 
     // Format: [vaultId]  "[vaultName]"  ([region])
-    const match = trimmed.match(/^([a-f0-9]+)\s+"([^"]+)"/);
+    const match = trimmed.match(/^([a-f0-9]+)\s+"([^"]+)"\s+\(([^)]+)\)/);
 
     if (match) {
-      vaults.push({ id: match[1], name: match[2] });
+      vaults.push({ id: match[1], name: match[2], region: match[3] });
     }
   }
 

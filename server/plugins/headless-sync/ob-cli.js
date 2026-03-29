@@ -1,29 +1,38 @@
 const { spawn, execSync } = require("child_process");
 const os = require("os");
 
+const isWindows = process.platform === "win32";
+
 function checkInstalled() {
   try {
-    const output = execSync("ob --version", { stdio: "pipe" }).toString().trim();
+    const output = execSync("ob --version", {
+      stdio: "pipe",
+      windowsHide: true,
+    })
+      .toString()
+      .trim();
+
     return { installed: true, version: output || "unknown" };
   } catch {
     return { installed: false, version: null };
   }
 }
 
+function spawnOb(args, opts = {}) {
+  return spawn("ob", args, {
+    env: { ...process.env, HOME: os.homedir() },
+    shell: isWindows,
+    windowsHide: true,
+    ...opts,
+  });
+}
+
 function runCommand(args, opts = {}) {
   return new Promise((resolve, reject) => {
-    const spawnOpts = {
-      env: { ...process.env, HOME: os.homedir() },
-    };
-
-    if (opts.cwd) {
-      spawnOpts.cwd = opts.cwd;
-    }
-
     let stdout = "";
     let stderr = "";
 
-    const proc = spawn("ob", args, spawnOpts);
+    const proc = spawnOb(args, opts);
 
     proc.stdout.on("data", (data) => {
       stdout += data.toString();
@@ -49,4 +58,4 @@ function runCommand(args, opts = {}) {
   });
 }
 
-module.exports = { checkInstalled, runCommand };
+module.exports = { checkInstalled, spawnOb, runCommand };
