@@ -7,6 +7,7 @@ services:
       - OBSIDIAN_VERSION=1.12.4
     volumes:
       - ./vaults:/vaults
+      - ./data:/app/data
       - obsidian-app:/app/obsidian-app
     restart: unless-stopped
 

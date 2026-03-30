@@ -8,7 +8,7 @@ module.exports = {
   id: "headless-sync",
   name: "Headless Sync",
   description: "Server-side vault sync via obsidian-headless CLI",
-  version: "0.1.0",
+  version: "0.3.0",
   //TODO: add server plugin manifest
 
   obsidianPlugin: path.join(__dirname, "plugin"),

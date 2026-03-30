@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.7.4] - Orm (2026-03-30)
+
+### Added
+
+- guards against running Obsidian sync and headless sync simultaneously
+
+### Changed
+
+- improved status indicator for headless sync
+
+## [0.7.3] - Orm (2026-03-30)
+
+### Added
+
+- status bar indicator for headless sync
+
 ## [0.7.2] - Orm (2026-03-29)
 
 ### Added
