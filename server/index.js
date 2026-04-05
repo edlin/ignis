@@ -1,7 +1,9 @@
 const express = require("express");
+const fs = require("fs");
 const path = require("path");
 const compression = require("compression");
 const config = require("./config");
+const { getVersion } = require("./version");
 const { setupWebSocket } = require("./ws");
 const watcher = require("./watcher");
 const { updateBridgePluginInAllVaults } = require("./bridge-plugin");
@@ -78,6 +80,45 @@ app.use("/vault-files", (req, res, next) => {
   // Rewrite req.url to strip the vault ID prefix, then serve statically
   req.url = "/" + parts.slice(1).join("/");
   express.static(vaultPath)(req, res, next);
+});
+
+// Serve index.html with ignis scripts injected in-flight (no files modified on disk)
+let cachedHtml = null;
+
+function getInjectedHtml() {
+  if (cachedHtml) {
+    return cachedHtml;
+  }
+
+  const htmlPath = path.join(config.obsidianAssetsPath, "index.html");
+  let html = fs.readFileSync(htmlPath, "utf-8");
+
+  const version = getVersion();
+
+  html = html.replace(
+    "</head>",
+    '  <link rel="icon" type="image/png" href="favicon.png">\n</head>',
+  );
+
+  html = html.replace(
+    '<script type="text/javascript"',
+    `<script type="text/javascript" src="ignis-ui.js?v=${version}"></script>\n` +
+      `<script type="text/javascript" src="shim-loader.js?v=${version}"></script>\n` +
+      '<script type="text/javascript"',
+  );
+
+  cachedHtml = html;
+  return cachedHtml;
+}
+
+app.get(["/", "/index.html"], (req, res) => {
+  res.set("Content-Type", "text/html; charset=utf-8");
+  res.set("Cache-Control", "no-cache");
+  res.send(getInjectedHtml());
+});
+
+app.get("/favicon.png", (req, res) => {
+  res.sendFile(path.join(__dirname, "..", "images", "favicon.png"));
 });
 
 // Serve dist files with cache headers based on version param

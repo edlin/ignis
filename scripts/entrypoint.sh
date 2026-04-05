@@ -52,12 +52,6 @@ else
   echo "[ignis] Obsidian already set up."
 fi
 
-# Always patch and copy latest bundles (they may have been updated between rebuilds)
-node /app/scripts/patch-obsidian.js "$OBSIDIAN_DIR"
-cp /app/dist/ignis-ui.js "$OBSIDIAN_DIR/ignis-ui.js"
-cp /app/dist/shim-loader.js "$OBSIDIAN_DIR/shim-loader.js"
-cp /app/images/favicon.png "$OBSIDIAN_DIR/favicon.png"
-cp /app/server/assets/* "$OBSIDIAN_DIR/" 2>/dev/null || true
 
 # Install obsidian-headless (ob CLI) if not already present.
 # Not included in the image for legal reasons - installed at runtime.

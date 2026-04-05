@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [0.7.5] - Orm (2026-04-05)
 
+### Changed
+
+- file patching to in-flight injection
+
+## [0.7.5] - Orm (2026-04-05)
+
 ### Added
 
 - per tab workspaces

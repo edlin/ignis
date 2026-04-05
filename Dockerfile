@@ -14,7 +14,7 @@ COPY server/plugins/ ./server/plugins/
 RUN npm run build
 
 # Production image. No Obsidian code included.
-# On first run, the entrypoint downloads and patches Obsidian.
+# On first run, the entrypoint downloads Obsidian.
 FROM node:22-slim
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
