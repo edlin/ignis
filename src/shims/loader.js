@@ -7,6 +7,14 @@ import { fsShim } from "./fs/index.js";
 installGlobals(); // process, Buffer, window overrides (before require so Buffer is available)
 installRequire(); // shim registry, window.require
 installCssOverrides(); // browser-specific CSS fixes
+
+// Set EmulateMobile flag for small viewports so Obsidian activates its mobile UI
+if (window.innerWidth < 600) {
+  localStorage.setItem("EmulateMobile", "true");
+} else {
+  localStorage.removeItem("EmulateMobile");
+}
+
 initialize(); // vault config, metadata cache, plugin prompt
 
 // Connect file watcher WebSocket after everything is initialized
