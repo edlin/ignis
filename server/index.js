@@ -82,30 +82,36 @@ app.use("/vault-files", (req, res, next) => {
   express.static(vaultPath)(req, res, next);
 });
 
-// Serve index.html with ignis scripts injected in-flight (no files modified on disk)
+// Serve our own index.html. Obsidian's scripts are discovered at startup
+// and injected dynamically by the client -- no Obsidian files are read or
+// transformed in the response.
 let cachedHtml = null;
 
-function getInjectedHtml() {
+function buildIndexHtml() {
   if (cachedHtml) {
     return cachedHtml;
   }
 
-  const htmlPath = path.join(config.obsidianAssetsPath, "index.html");
-  let html = fs.readFileSync(htmlPath, "utf-8");
-
   const version = getVersion();
 
-  html = html.replace(
-    "</head>",
-    '  <link rel="icon" type="image/png" href="favicon.png">\n</head>',
-  );
+  // Discover Obsidian's script tags from their index.html
+  const obsidianHtmlPath = path.join(config.obsidianAssetsPath, "index.html");
+  const obsidianHtml = fs.readFileSync(obsidianHtmlPath, "utf-8");
+  const scriptRegex = /<script[^>]+src="([^"]+)"[^>]*>/g;
+  const scripts = [];
+  let match;
 
-  html = html.replace(
-    '<script type="text/javascript"',
-    `<script type="text/javascript" src="ignis-ui.js?v=${version}"></script>\n` +
-      `<script type="text/javascript" src="shim-loader.js?v=${version}"></script>\n` +
-      '<script type="text/javascript"',
-  );
+  while ((match = scriptRegex.exec(obsidianHtml)) !== null) {
+    scripts.push(match[1]);
+  }
+
+  // Build from our own template
+  const templatePath = path.join(__dirname, "assets", "index.html");
+  let html = fs.readFileSync(templatePath, "utf-8");
+
+  html = html.replace("__IGNIS_UI_SRC__", `ignis-ui.js?v=${version}`);
+  html = html.replace("__SHIM_LOADER_SRC__", `shim-loader.js?v=${version}`);
+  html = html.replace("__OBSIDIAN_SCRIPTS__", JSON.stringify(scripts));
 
   cachedHtml = html;
   return cachedHtml;
@@ -114,7 +120,7 @@ function getInjectedHtml() {
 app.get(["/", "/index.html"], (req, res) => {
   res.set("Content-Type", "text/html; charset=utf-8");
   res.set("Cache-Control", "no-cache");
-  res.send(getInjectedHtml());
+  res.send(buildIndexHtml());
 });
 
 app.get("/favicon.png", (req, res) => {

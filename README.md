@@ -133,7 +133,7 @@ This project is licensed under the [GNU Affero General Public License v3.0](LICE
 
 Ignis is not affiliated with, endorsed by, or associated with Dynalist Inc. or Obsidian.
 
-Ignis is an independently developed interoperability tool. It contains no Obsidian source code, binaries, or assets. No part of Obsidian is distributed, bundled, or included in this repository. Obsidian's own files are not altered, patched, or modified on disk. The shim is loaded before Obsidian at runtime and intercepts API calls in memory.
+Ignis is an independently developed interoperability tool. It contains no Obsidian source code, binaries, or assets. No part of Obsidian is distributed, bundled, or included in this repository. Ignis serves its own HTML page that loads the shim layer, then dynamically loads Obsidian's unmodified scripts. Obsidian's own files are never altered, patched, or transformed, either on disk or in transit.
 
 Ignis works by providing a compatibility layer that implements browser-compatible equivalents of the Node.js and Electron APIs that Obsidian depends on. The user must obtain their own licensed copy of Obsidian separately. Ignis has no standalone functionality without it.
 
