@@ -4,6 +4,7 @@ import { vaultService } from "../services/vault-service.js";
 import { showPluginInstallDialog } from "../ui/bootstrap.js";
 import { registerReadTransform } from "./fs/read-transforms.js";
 import { resolveWorkspaceName, initWorkspacePatch } from "./workspace.js";
+import { prefetchVaultContent } from "./fs/indexer-prefetch.js";
 
 function resolveVaultId() {
   const urlParams = new URLSearchParams(window.location.search);
@@ -218,6 +219,14 @@ export function initialize() {
     window.__vaultList = bootstrap.vaultList;
     applyTree(bootstrap.tree);
     applyCoreSyncGuard(bootstrap.plugins);
+
+    // Race the indexer: batch-fetch text content into ContentCache so
+    // Obsidian's startup indexing reads hit the cache instead of the network.
+    prefetchVaultContent(
+      window.__currentVaultId,
+      bootstrap.tree,
+      fsShim._contentCache,
+    );
   } else {
     initVaultConfigFallback();
     initVaultListFallback();

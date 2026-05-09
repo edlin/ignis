@@ -479,6 +479,58 @@ router.post("/utimes", async (req, res) => {
   }
 });
 
+// POST /api/fs/batch-read { paths, vault } - bulk read text file contents
+// Used by the indexer pre-fetcher to avoid N round trips during startup.
+router.post("/batch-read", async (req, res) => {
+  const vaultRoot = getVaultRoot(req, res);
+
+  if (!vaultRoot) {
+    return;
+  }
+
+  const paths = Array.isArray(req.body?.paths) ? req.body.paths : [];
+
+  if (paths.length === 0) {
+    return res.json({ files: {} });
+  }
+
+  const files = {};
+
+  await Promise.all(
+    paths.map(async (relPath) => {
+      const resolved = resolveVaultPath(vaultRoot, relPath);
+
+      if (!resolved) {
+        return;
+      }
+
+      try {
+        const buffered = getPending(resolved);
+
+        if (buffered) {
+          if (typeof buffered.data === "string") {
+            files[relPath] = buffered.data;
+          } else if (
+            buffered.encoding === "utf8" ||
+            buffered.encoding === "utf-8"
+          ) {
+            files[relPath] = buffered.data.toString("utf-8");
+          }
+          return;
+        }
+
+        const data = await fs.promises.readFile(resolved, "utf-8");
+        files[relPath] = data;
+      } catch {
+        // Skip unreadable files silently. The client falls back to a
+        // normal readFile when a path isn't in the response.
+      }
+    }),
+  );
+
+  res.json({ files });
+});
+
 // GET /api/fs/tree?path=...&vault=... returns full recursive file tree with metadata
 router.get("/tree", async (req, res) => {
   const vaultRoot = getVaultRoot(req, res);
