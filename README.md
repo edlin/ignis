@@ -8,6 +8,10 @@
   <p align="center">
     Run Obsidian in the browser. No remote desktop required.
   </p>
+
+  <p align="center">
+    <a href="https://ignis-demo.thiefling.com">Try the live demo</a>
+  </p>
 </section>
 
 ## What is this
@@ -20,35 +24,70 @@ While Obsidian's local-first approach works well for most users, options for acc
 
 ## Project Status
 
-Ignis is **experimental**. Core functionality works, and some browser specific enhancements have been added, like file upload and download. Plugin support is an ongoing process of trying out plugins and finding what gaps in the shim still need to be plugged, but if a plugin uses primarily Obsidian's plugin API chances are it will work just fine.
+What started as an experiment turned out to be more viable than expected, and the project has grown into a usable browser-based client with multi-vault support, file upload and download, workspaces opened across browser tabs, and live sync between tabs. I now use it as my everyday Obsidian instance and intend to maintain it for the foreseeable future.
+
+Plugin compatibility depends on what APIs a plugin uses; most plugins built on Obsidian's plugin API work, anything requiring Node native modules or `child_process` doesn't. See [What doesn't work](#what-doesnt-work) for the full list of known limitations.
 
 ## What works
 
-- Creating, opening, and switching between multiple vaults
-- Editing notes (markdown, canvas, bases, all core editor features)
-- Community plugins to some degree (anything that doesn't need native Node modules, hopefully).
-- File upload and download from the browser
-- Live sync of external file changes via WebSocket
-- Obsidian Sync has been tested and seems to be working fine, as long as the tab remains open obviously.
-- Obsidian Headless has been integrated and can be used for continous synchronization. Can't be used alongside Obsidian Sycn in the browser, you can only pick one sync solution in order to avoid conflicts.
+- All core editor features: markdown, canvas, bases, and the command palette.
+- Context menus throughout the UI.
+- Image rendering, inline image URLs, and image paste from the clipboard.
+- Print to PDF, via a hidden popup iframe.
+- Mobile UI auto-activates when the window is under 600 px wide.
+- Themes and CSS snippets.
+- Most community plugins built on Obsidian's plugin API.
+- Cross-origin plugin requests via `requestUrl` and `fetch`, proxied through the server.
+- Obsidian Sync, in self-hosted deployments with a logged-in browser tab open.
 
-## Plugin Compatibility
+## What doesn't work
 
-Plugin support depends on what APIs a plugin uses. Anything built on Obsidian's plugin API generally works. Plugins that depend on Node.js modules might work depending on which are used.
+- Plugins that depend on Node native modules or `child_process` won't load.
+- Streaming `zlib` classes (`createGzip`, `createDeflate`, etc.) aren't implemented. The synchronous and callback variants work via `pako`.
+- The synchronous file picker (`dialog.showOpenDialogSync`), used by plugins like Importer, has a staged-files workaround: the shim asks you to pick once and serves the result on retry. Usable but rough.
+- `safeStorage` is passthrough by design: `isEncryptionAvailable()` returns `false` and `encrypt`/`decrypt` are no-ops. Anything plugins store via `safeStorage` ends up as plaintext on disk. A server-side encrypted option is planned but not yet implemented; until then, treat anything `safeStorage` produces the same as anything else in the vault.
 
-Compatibility is currently tracked in [Issue #9](https://github.com/Nystik-gh/ignis/issues/9).
+Compatibility for specific community plugins is tracked in [Issue #9](https://github.com/Nystik-gh/ignis/issues/9).
 
-## Caveats
+## What Ignis adds on top of default Obsidian features
 
-_This section will be expanded as issues are documented._
+**Vaults.**
+- Custom UI for Obsidian's multi-vault support, allowing create, open, switch, rename, and delete. 
+- Different vaults can be loaded in different browser tabs.
 
-- Community plugins that rely on `child_process` or native Node addons will not work at the moment.
-- Mobile browser support is not a priority. It works, but the UX is not great. But I have ideas.
-- File picker has a workaround to deal with synchronous file selection issues. Usable, a bit hacky.
+**Files.**
+- File upload from the local machine via a ribbon icon, right-click on a folder -> Upload file, or drag-and-drop into the UI. 
+- File and folder download via right-click any note -> **Download**, or any folder -> **Download as ZIP**.
+
+**Multi-tab and workspaces.**
+- Live file sync between browser tabs via WebSocket: open the same vault in two tabs and edits propagate within a second. 
+- Saved workspaces can be opened in separate browser tabs via a `?workspace=` URL parameter, so each tab can hold a different layout of the same vault.
+- The bridge plugin adds an "Open workspace in tab" command to the command palette.
+
+**Server-side sync.** 
+- Obsidian Headless is implemented as a server-side plugin that performs continuous sync without needing an active browser tab. Only one of Obsidian Sync or Obsidian Headless can run per vault.
+
+**Server-side integration.** 
+- Adds a plugin system inside the server itself, separate from Obsidian's community plugin system (WIP).
+- Ignis-specific settings appear as their own tabs inside Obsidian's Settings modal.
+- Status bar indicators surface server state and headless sync activity.
+
+## Performance
+
+A few design decisions worth knowing about for someone evaluating Ignis against large vaults or slow storage:
+
+- A pre-compressed bootstrap response delivers vault info, vault list, metadata tree, and plugin list in a single call.
+- Indexer pre-fetch warms the content cache so Obsidian's startup index hits cache instead of the network.
+- An LRU content cache (50 MB by default) keeps memory use bounded regardless of vault size, so Ignis doesn't hold the whole vault in memory.
+- Write coalescing debounces rapid writes for slow filesystems (rclone, FUSE, NFS, SMB).
+
+## Browser compatibility
+
+Tested in Chrome, Brave, and Firefox, with limited testing in Safari.
 
 ## Authentication
 
-Ignis has **no built-in authentication**. The server is completely open by default.
+Ignis has **no built-in authentication** and serves plain HTTP by default. Both authentication and TLS termination are expected to be handled by whatever you put in front of it.
 
 If you are exposing Ignis to the internet, **you should really** put an authentication layer in front of it. Options include:
 
@@ -66,22 +105,12 @@ Example for Basic Auth, and Authelia can be found [here](examples).
 
 ## Setup with Docker Compose
 
-Ignis is not published to a registry yet. You need to build the image locally.
-
-```bash
-git clone https://github.com/Nystik-gh/ignis.git
-cd ignis
-docker compose up -d
-```
-
-On first start, the container will download Obsidian from the official servers and set everything up, and also install Obsidian Headless CLI. This takes a minute or two.
-
 Example `docker-compose.yml`:
 
 ```yaml
 services:
   ignis:
-    build: .
+    image: nobbe/ignis:latest
     ports:
       - "8080:8080"
     environment:
@@ -97,6 +126,10 @@ services:
 volumes:
   obsidian-app:
 ```
+
+Then `docker compose up -d`. On first start the container downloads Obsidian from the official source and installs Obsidian Headless CLI. This takes a minute or two.
+
+To build from source instead of pulling the image, clone the repo and replace `image: nobbe/ignis:latest` with `build: .`.
 
 ### Volumes
 
@@ -114,15 +147,27 @@ volumes:
 | `VAULT_ROOT` | Path to vault storage inside the container | `/vaults` |
 | `DATA_ROOT` | Path to persistent data (plugin config, sync state, auth tokens) | `/app/data` |
 | `OBSIDIAN_VERSION` | Obsidian version to download | `1.12.7` |
+| `OBSIDIAN_ASSETS_PATH` | Where the extracted Obsidian app files live. Override if you're pointing at a pre-extracted directory instead of letting the entrypoint download. | `/app/obsidian-app` |
+| `AUTO_CREATE_DEFAULT` | When `true`, creates a "My Vault" vault on startup if no vaults exist. Useful for fresh installs. | `false` |
 | `PUID` | User ID for file ownership | `1000` |
 | `PGID` | Group ID for file ownership | `1000` |
 | `WRITE_COALESCE_MS` | Debounce window (ms) for rapid writes. Useful for slow filesystems (rclone, NFS, SMB). Set to `0` to disable. | `5000` |
-| `DEMO_MODE` | Enable demo mode (per-session vaults, auto-cleanup, proxy allowlist, login blocking). See [examples/demo/](examples/demo/). | `false` |
-| `DEMO_MAX_SESSIONS` | Concurrent demo session cap. New visitors get a 503 capacity page when full. | `20` |
-| `DEMO_VAULTS_PER_SESSION` | Max vaults per session (vault create returns 507 past this). | `3` |
-| `DEMO_SESSION_QUOTA_BYTES` | Cumulative byte budget per session across all session vaults. | `716800` |
-| `DEMO_TIMEOUT_MS` | Inactivity timeout before a demo session and its vaults are cleaned up. | `1800000` |
-| `DEMO_TEMPLATE_DIR` | Directory copied into each new demo vault. | `server/demo-template/` |
+
+Demo mode adds its own set of env vars (per-session vaults, auto-cleanup, proxy allowlist, login blocking). See [examples/demo/](examples/demo/) if you want to run a public demo deployment.
+
+### Migrating an existing vault
+
+Each subdirectory of `/vaults` is treated as a separate vault, so dropping in an existing Obsidian vault directory will make it available in Ignis.
+
+### Upgrading Obsidian
+
+Obsidian releases can include changes that break the compatibility shim. Each Ignis release pins a known-working Obsidian version through the `OBSIDIAN_VERSION` env var, so the recommended path is to wait for an Ignis release that bumps the version, pull the new image, and restart.
+
+If you want to try a newer Obsidian version before Ignis updates, set `OBSIDIAN_VERSION` in your compose file. The entrypoint will download that version on next start, but there's no guarantee it'll work cleanly with the current shim.
+
+### Backups
+
+Vault data lives as ordinary files in `/vaults`. Back it up however you back up other server-side data; Ignis doesn't provide a built in backup mechanism.
 
 ## Contributing
 
@@ -138,46 +183,8 @@ This project is licensed under the [GNU Affero General Public License v3.0](LICE
 
 ## Legal Notice
 
-Ignis is not affiliated with, endorsed by, or associated with Dynalist Inc. or Obsidian.
+Ignis is not affiliated with, endorsed by, or associated with Dynalist Inc. or Obsidian. It is an independently developed interoperability tool and contains no Obsidian source code, binaries, or assets. No part of Obsidian is distributed or included in this repository; the Docker container downloads Obsidian directly from its official source at runtime.
 
-Ignis is an independently developed interoperability tool. It contains no Obsidian source code, binaries, or assets. No part of Obsidian is distributed, bundled, or included in this repository. Ignis serves its own HTML page that loads the shim layer, then dynamically loads Obsidian's unmodified scripts. Obsidian's own files are never altered, patched, or transformed, either on disk or in transit.
+This work falls under the interoperability provisions of [Directive 2009/24/EC](https://eur-lex.europa.eu/eli/dir/2009/24/oj/eng) (the EU Software Directive), Article 6. See [LEGAL.md](LEGAL.md) for the full rationale.
 
-Ignis works by providing a compatibility layer that implements browser-compatible equivalents of the Node.js and Electron APIs that Obsidian depends on. The user must obtain their own licensed copy of Obsidian separately. Ignis has no standalone functionality without it.
-
-### Interoperability under EU law
-
-The development of Ignis involved studying Obsidian's module interface layer to understand how it interacts with the Electron and Node.js runtime. This work falls under the interoperability provisions of [Directive 2009/24/EC of the European Parliament and of the Council](https://eur-lex.europa.eu/eli/dir/2009/24/oj/eng) (the EU Software Directive), which permits decompilation and analysis of a computer program to achieve interoperability with an independently created program.
-
-Specifically:
-
-- **Article 6(1)** permits reproduction and translation of code where it is indispensable to obtain the information necessary to achieve interoperability of an independently created program with other programs, provided that: (a) the acts are performed by a person having a right to use the program, (b) the interoperability information was not previously readily available, and (c) the acts are confined to the parts necessary to achieve interoperability.
-- **Article 5(3)** permits a lawful user to observe, study, and test the functioning of a program to determine the ideas and principles underlying its elements, including its interfaces.
-- **Article 8** states that any contractual provisions contrary to Article 6 or the exceptions in Article 5(2) and (3) shall be null and void.
-
-The shim layer targets the runtime interface boundary, the points where Obsidian calls Node.js and Electron APIs, and replaces them with browser-compatible equivalents backed by a server. No Obsidian application logic, algorithms, or non-interface code is reproduced. Ignis also includes a plugin that uses Obsidian's plugin API to add browser-specific functionality such as file upload and download. This plugin interacts with Obsidian in the same manner as any third-party community plugin.
-
-### What Ignis does and does not do
-
-**Does:**
-- Provide independently written JavaScript modules that implement Node.js and Electron API surfaces in a browser context
-- Provide a server that exposes filesystem operations over HTTP and WebSocket
-- Load a shim layer at runtime that intercepts Obsidian's API calls before they reach the (absent) Node.js and Electron environment
-
-**Does not:**
-- Distribute, bundle, or include any Obsidian source code, binaries, or assets in this repository. Obsidian is downloaded by the user's own container instance directly from official sources at runtime.
-- Modify, patch, or alter any of Obsidian's files on disk
-- Reproduce Obsidian's application logic, algorithms, or non-interface code
-- Function as a standalone application without Obsidian
-- Compete with or replace Obsidian
-
-### Regarding Obsidian's Terms of Service
-
-Obsidian's Terms of Service (Section: Restrictions, item iii) restrict reverse engineering except for the purpose of developing third-party plugins for non-commercial use. To the extent that this restriction conflicts with the rights granted under the EU Software Directive, Article 8 of the Directive renders such contractual provisions null and void.
-
-This project is developed and maintained by an individual based in the European Union, where the Directive applies as implemented in national law.
-
-### Good faith
-
-This project exists because its author uses Obsidian daily and wants to access it from a browser. It is shared in the belief that tools enabling software interoperability benefit users and are protected under EU law. There is no intent to harm Obsidian, Dynalist Inc., or their business. If you are a representative of Dynalist Inc. and wish to discuss this project, please reach out via the contact information provided below.
-
-Email: ignis@thiefling.com
+This project exists because its author uses Obsidian daily and wants to access it from a browser. There is no intent to harm Obsidian, Dynalist Inc., or their business. If you are a representative of Dynalist Inc. and wish to discuss this project, please reach out: ignis@thiefling.com

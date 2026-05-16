@@ -24,32 +24,41 @@ The shim layer makes Obsidian think it's running in Electron. The bridge plugin 
 
 ### Loading
 
-The server serves its own `index.html` (in `server/assets/`) rather than Obsidian's. At startup it reads Obsidian's `index.html` once to discover which scripts Obsidian expects, then embeds that list in our HTML as a JSON array. The client-side HTML loads the shim loader and UI bundle first (non-deferred), then a small inline script dynamically injects Obsidian's scripts in order. Obsidian's files are never modified, read into responses, or transformed in transit.
+The server serves its own `index.html` (in `server/assets/`) rather than Obsidian's. At startup it reads Obsidian's `index.html` once to discover which scripts Obsidian expects, then embeds that list in our HTML as a JSON array. The client-side HTML loads the shim loader and UI bundle first (non-deferred), then a small inline script dynamically injects Obsidian's scripts in order. Obsidian's files are never modified on disk, or transformed in transit.
 
-The shim loader replaces the module system and makes a blocking HTTP request to fetch the vault's directory tree into memory. The request has to be blocking because Obsidian makes synchronous filesystem calls during page load, before the event loop is running, so the cache has to already be populated.
+Before injecting Obsidian's scripts, the shim loader sets `localStorage.EmulateMobile` based on viewport width (< 600px) so Obsidian boots into its mobile UI on phones and narrow windows. The loader replaces the module system, then issues a single blocking bootstrap request that returns the vault info, vault list, metadata tree, and Ignis plugin list in one pre-compressed response. The request has to be blocking because Obsidian makes synchronous filesystem calls during page load, before the event loop is running, so the cache has to already be populated.
+
+Immediately after the bootstrap response is applied, the client kicks off a batched pre-fetch of text file content into the ContentCache (`POST /api/fs/batch-read`). This races Obsidian's indexer so the first wave of `readFile` calls during startup indexing tend to hit the cache instead of the network.
 
 ### Modules
 
-| Module               | Implementation                                                                    |
-| -------------------- | --------------------------------------------------------------------------------- |
-| `fs` / `original-fs` | HTTP transport + client-side metadata/content caches                              |
-| `electron`           | ipcRenderer dispatcher, webFrame stubs                                            |
-| `@electron/remote`   | Partial: clipboard (browser API), shell, dialog, Menu, BrowserWindow, nativeTheme |
-| `path`               | path-browserify                                                                   |
-| `crypto`             | Web Crypto (randomBytes, createHash, scrypt)                                      |
-| `url`                | Browser URL API wrapper                                                           |
-| `process`            | Platform/version stubs                                                            |
-| `utils`              | Utility functions                                                                 |
+| Module               | Implementation                                                                                  |
+| -------------------- | ----------------------------------------------------------------------------------------------- |
+| `fs` / `original-fs` | HTTP transport + client-side metadata cache + 50MB LRU content cache. Full surface.             |
+| `path`               | path-browserify                                                                                 |
+| `url`                | Browser URL API wrapper                                                                         |
+| `process`            | Platform/version stubs                                                                          |
+| `crypto`             | `randomBytes`, `randomUUID`, `scrypt` use Web Crypto. `createHash` produces real digests for SHA-1/SHA-256/SHA-512/MD5 via `@noble/hashes`. |
+| `electron`           | `ipcRenderer` dispatcher, `webFrame` stubs, `clipboard`, `nativeImage`, `safeStorage` (passthrough, reports unavailable). |
+| `@electron/remote`   | Partial: `clipboard`, `shell`, `dialog` (with a sync file picker workaround), `Menu`, `BrowserWindow`, `nativeTheme`, `session`, `systemPreferences`, `screen`, `nativeImage`, `Notification`, `app`. |
+| `zlib`               | Sync + callback variants via pako (`deflate`, `inflate`, `gzip`, `gunzip`, raw). Streaming classes (`createGzip` etc.) throw. |
+| `os`                 | Identity stubs (`platform()` returns `"linux"`, `hostname()` returns `"localhost"`, etc.).      |
+| `events`             | Standard EventEmitter implementation.                                                           |
+| `util`               | Common helpers (`promisify`, `inherits`, type guards).                                          |
+| `child_process`      | All functions throw "not available in the web version."                                         |
+| `net`                | All classes/functions throw.                                                                    |
+| `http` / `https`     | Module is importable but `request()`/`get()` emit an `error` event; `createServer` throws. Plugins should use `requestUrl` or `fetch` (the shim routes cross-origin `fetch` through the server proxy). |
+| `buffer`             | Aliased to the browser `Buffer` polyfill set up by the loader.                                  |
 
-Unknown modules return an empty proxy and log a warning. The shim exposes two console helpers, one showing everything that has been accessed and one showing what is missing.
+Unknown modules return an empty proxy and log a warning. The `node:` prefix is stripped. The shim exposes two console helpers, `window.__shimLog()` (everything that has been accessed) and `window.__shimMisses()` (accessed-but-missing properties).
 
 ### Filesystem
 
-On page load the server returns the full directory tree, which gets cached in memory with paths, sizes, and modification times. Sync filesystem calls hit the cache rather than the network. File contents are cached in an LRU cache after first read.
+Two caches on the client side. The **MetadataCache** holds `{ type, size, mtime, ctime }` for every entry, populated from the bootstrap response. Sync filesystem calls (`existsSync`, `statSync`, `readdirSync`) read from it and never hit the network. The **ContentCache** is a 50 MB LRU of file bytes, populated lazily on first read and warmed by the indexer pre-fetch on cold start. Both caches are kept current by WebSocket watcher events: writes from another tab or external changes on disk invalidate or update the relevant entries within a second.
 
-Writes go through a server-side write coalescer (`server/write-coalescer.js`) designed for slow filesystems like rclone FUSE mounts. The first write to a file goes to disk immediately. Subsequent writes within a configurable window (default 5 seconds, `WRITE_COALESCE_MS`) are buffered in memory; the timer resets on each write. After the window elapses with no new writes, the buffered data is flushed to disk. Reads for pending paths serve the buffered content so clients never see stale data. All pending writes are flushed on graceful shutdown.
+Reads not satisfied by ContentCache go through the transport layer to `/api/fs/readFile`. Sync calls use synchronous XHR to keep Obsidian's pre-boot module code working. Async calls use fetch. The transport handles vault id injection, base64 encoding for binary files, and mapping HTTP error codes back to Node errno values (`ENOENT`, `EEXIST`, `ENOTDIR`).
 
-Sync calls use synchronous XHR to ensure blocking behavior. Async calls use fetch. Everything goes through a transport layer that handles vault ID injection, base64 encoding for binary files, and mapping HTTP error codes back to Node errno values.
+Writes go through a server-side write coalescer (`server/write-coalescer.js`) designed for slow filesystems like rclone FUSE mounts. The first write to a path goes to disk immediately. Subsequent writes within a configurable window (default 5 seconds, `WRITE_COALESCE_MS`) are buffered and flushed when the debounce timer fires; the timer resets on each write. Buffered writes return to the HTTP client immediately with synthetic metadata so connection-pool starvation on rapid-fire writes (e.g. `workspace.json` autosaves) doesn't stall unrelated reads. Reads for pending paths serve the buffered content so clients never see stale data. All pending writes are flushed on graceful shutdown.
 
 ### Translation registry
 
@@ -63,31 +72,51 @@ All hooks are synchronous and registered at module load. Translation happens onc
 
 ### IPC
 
-IPC is implemented as a synchronous dispatcher that maps channel names to handlers.
+Electron's `ipcRenderer` is the renderer's channel to the main process for things only that process can do: looking up the active vault, opening a new vault window, performing cross-origin requests, printing to PDF. Ignis has no main process, so the shim is an in-process router that returns values for sync calls and fires side effects for async ones.
+
+Sync channels covered include `vault`, `version`, `vault-list`, `vault-open`, `vault-remove`, `file-url`, `starter`, and `help`. Each maps to a handler that returns immediately. Async channels: `request-url` is routed to the CORS proxy, `print-to-pdf` triggers a hidden popup iframe, `context-menu` replies on the next tick. The standard `on`/`once`/`removeListener` interface works as it would in Electron.
+
+### Cross-origin requests
+
+Obsidian on the desktop can make arbitrary cross-origin HTTP requests because it runs as an Electron app rather than a sandboxed browser context. In a browser tab, the same requests would be blocked by CORS or rejected by the same-origin policy. Plugin installs from GitHub, theme asset downloads, calls to third-party APIs: all of it assumes cross-origin is available.
+
+The shim handles this transparently. `window.fetch` and `window.requestUrl` are intercepted. Same-origin requests pass through unchanged. Cross-origin requests are POSTed to `/api/proxy`, which performs the outbound call from the server with headers that mimic Obsidian's desktop runtime: `Origin: app://obsidian.md` and the browser's own User-Agent. The response body is returned base64-encoded so binary content survives the JSON round-trip; the shim decodes it and hands the caller a normal `Response` or `requestUrl` result.
+
+The proxy itself is intentionally generic. It forwards method, headers, and body verbatim and returns whatever the upstream sent. In demo mode, an allowlist restricts the hostname to a known-safe set; in normal self-hosted mode there's no restriction, which is one of the reasons the server needs to be behind authentication when exposed to the internet.
+
+### Workspaces in browser tabs
+
+Obsidian's Workspaces core plugin lets you save a window layout under a name. Ignis adds a `?workspace=<name>` URL parameter that binds a tab to a specific layout. The bridge plugin's "Open workspace in new tab" command opens the picked workspace at `?workspace=<name>` in a fresh tab.
+
+The fs shim redirects reads and writes of `.obsidian/workspace.json` to a per-workspace file (`.obsidian/workspace.<name>.json`), giving each tab its own layout. It also rewrites the active field on reads of `workspaces.json` so each tab's menu shows its own workspace as active.
+
+Two tabs sharing a vault stay in sync through the file watcher.
 
 ### Obsidian Plugin Compatibility
 
-Obsidian evals plugin code with its own require that checks its internal module map first, then falls back to the window-level require, which is the shim. Plugins that use the filesystem, path utilities, or crypto get the shim implementations without any changes. Plugins that need child processes or native addons won't work (for now)*.
-
-__child_process may be shimmable, not yet explored__
+Obsidian evals plugin code with its own require that checks its internal module map first, then falls back to the window-level require, which is the shim. Plugins that use the filesystem, path utilities, or crypto get shim implementations without any changes. Plugins that need child processes, raw sockets, or native addons will load but throw on use; the error message names the missing API.
 
 ## Vaults
 
-Any subdirectory under the vault root is treated as a vault. The active vault is selected via a `?vault=` URL parameter. Without the queryparam, the last active vault is loaded, or the first discovered.
+Any subdirectory under the vault root is treated as a vault. The active vault is selected via a `?vault=` URL parameter. Without the queryparam, the last active vault is loaded (from `localStorage.last-vault`), or the first discovered.
 
 ## Server
 
 An Express server that handles filesystem operations, vault management, static file serving, and plugin route dispatch.
 
 **Route groups:**
-- `/api/fs/*`  - filesystem operations (read, write, stat, tree, mkdir, etc.)
-- `/api/vault/*`  - vault CRUD and config
-- `/api/plugins/*`  - Ignis plugin management (list, enable, disable) __WIP__
-- `/api/ext/:pluginId/*`  - routes registered by individual Ignis plugins
+- `/api/fs/*` - filesystem operations (read, write, stat, tree, mkdir, batch-read, download, download-zip, etc.).
+- `/api/vault/*` - vault CRUD and config.
+- `/api/bootstrap` - one-shot cold-start endpoint; returns vault info + list + metadata tree + plugin list as a single pre-compressed response, cached per vault with mtime-based invalidation.
+- `/api/proxy` - cross-origin HTTP proxy used by the fetch and requestUrl shims.
+- `/api/version` - server version and git hash.
+- `/api/plugins/*` - Ignis plugin management (list, enable, disable). __WIP__
+- `/api/ext/:pluginId/*` - routes registered by individual Ignis plugins.
+- `/vault-files/<vaultId>/<path>` - static file serving rooted at a vault, used by Obsidian for image/attachment resource URLs.
 
-**WebSocket:** A file watcher monitors vault directories and pushes change events to connected clients, keeping the client-side metadata and content caches in sync. The websocket is also used by the headless-sync plugin to report status.
+**WebSocket:** A file watcher monitors vault directories and pushes change events to connected clients, keeping the client-side metadata and content caches in sync. An echo guard suppresses events caused by the same client's recent writes so they don't bounce back. The watcher also carries plugin-defined message types (e.g. headless-sync status broadcasts).
 
-**Bridge plugin auto-install:** On server startup and vault creation, the server copies the ignis-bridge plugin into each vault's `.obsidian/plugins/` directory.
+**Bridge plugin auto-install:** On server startup and on vault creation, the server copies the ignis-bridge plugin into each vault's `.obsidian/plugins/` directory.
 
 ## Plugins
 
@@ -101,7 +130,12 @@ Standard community and core Obsidian plugins. They work through the shim layer w
 
 An Obsidian plugin auto-installed into every vault by the server. Source lives in `plugin/`, built to `plugin/main.js`.
 
-It adds file actions to Obsidian's UI: file download, folder ZIP download, and file upload via ribbon icon and context menu. It also injects custom settings tabs into Obsidian's settings modal by monkey-patching `app.setting.onOpen`, currently providing an Ignis plugin management tab.
+It contributes:
+- **File actions**: a ribbon icon for uploading files into the current folder, and right-click menu items: Download (single file), Download as ZIP (folder), and Upload file (folder).
+- **Commands**: `Open workspace in new tab` (with a FuzzySuggestModal listing saved workspaces).
+- **Status bar item**: a dot showing the WebSocket connection state to the Ignis server.
+- **Settings injection**: monkey-patches `app.setting.onOpen` to add two tabs in their own "Ignis" sidebar group. General (server status, version, GitHub link, update check against the GitHub releases API) and Core plugins (toggle the bundled Obsidian plugins of enabled Ignis plugins on/off per vault). Each enabled Ignis plugin's bundled Obsidian plugin also gets pulled into a separate "Ignis Core Plugins" sidebar group.
+- **Demo guards**: in demo mode, a MutationObserver disables every email/password input that appears anywhere in the document and rewrites its placeholder.
 
 Not user-installable through Obsidian's plugin browser. Managed entirely by the server.
 
@@ -112,6 +146,8 @@ A basic plugin system for extending the server. Still early, the core lifecycle 
 An Ignis plugin is a Node.js package under `server/plugins/<name>/` that exports an id, name, and a `register` function. On load it receives a context object with access to config, the WebSocket server, a file watcher, an Express router, a logger, and a persistent data directory. Plugins are enabled and disabled per vault, with state persisted in `data/plugin-config.json`.
 
 When enabled, a plugin's Express router is mounted at `/api/ext/<pluginId>/`. A plugin can also optionally bundle an Obsidian plugin, a directory containing a standard Obsidian plugin (manifest.json, main.js) that gets auto-installed into the vault on enable and removed on disable. This bridges the server and client sides: the Ignis plugin handles server logic and routes, while the bundled Obsidian plugin provides the in-app UI or behavior.
+
+The one Ignis plugin currently in the repo is **headless-sync** (`server/plugins/headless-sync/`). It wraps the [obsidian-headless](https://github.com/Yuri-Khomyakov/obsidian-headless) CLI (`ob`) and runs `ob sync --continuous` as a per-vault child process, optionally with `--pull-only` or `--mirror-remote`. Process state (running/stopped/error, pid, last activity, recent log lines) is broadcast over the WebSocket via a small per-vault subscription protocol. The bundled Obsidian plugin (`ignis-headless-sync`) adds a status bar item, a settings tab with start/stop/unlink controls, and a core-sync guard that hides Obsidian's own Sync setting from `core-plugins.json` reads while headless sync is active for that vault, so a different device syncing the "Active core plugins list" can't accidentally re-enable it.
 
 ## Demo mode
 
