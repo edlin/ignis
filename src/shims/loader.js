@@ -3,9 +3,11 @@ import { installGlobals } from "./globals.js";
 import { installCssOverrides } from "./css-overrides.js";
 import { initialize } from "./init.js";
 import { fsShim } from "./fs/index.js";
+import { registerUI } from "./ui-registry.js";
 
 // __IGNIS_VERSION__ is replaced at build time from package.json.
 window.__ignis = { version: __IGNIS_VERSION__ };
+window.__ignis_registerUI = registerUI;
 
 installGlobals(); // process, Buffer, window overrides (before require so Buffer is available)
 installRequire(); // shim registry, window.require

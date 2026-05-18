@@ -3,7 +3,7 @@ import {
   registerPopupWindow,
   unregisterPopupWindow,
 } from "./electron/remote/window.js";
-import { showVaultManager } from "../ui/bootstrap.js";
+import { showVaultManager } from "./ui-registry.js";
 
 function installProcess() {
   window.process = processShim;

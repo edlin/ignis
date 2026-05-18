@@ -1,7 +1,7 @@
 import { fsShim } from "./fs/index.js";
 import { installRequestUrlShim } from "./request-url.js";
 import { vaultService } from "../services/vault-service.js";
-import { showPluginInstallDialog } from "../ui/bootstrap.js";
+import { showPluginInstallDialog } from "./ui-registry.js";
 import { registerReadTransform } from "./fs/transforms.js";
 import {
   resolveWorkspaceName,

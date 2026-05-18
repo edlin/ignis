@@ -1,6 +1,6 @@
 import { vaultService } from "../services/vault-service.js";
 
-export function showVaultManager() {
+function showVaultManager() {
   if (document.querySelector(".vault-manager-overlay")) return;
 
   new window.IgnisUI.VaultManager({
@@ -9,7 +9,7 @@ export function showVaultManager() {
   });
 }
 
-export function showMessageDialog(title, message) {
+function showMessageDialog(title, message) {
   return new Promise((resolve) => {
     const dialog = new window.IgnisUI.MessageDialog({
       target: document.body,
@@ -23,7 +23,7 @@ export function showMessageDialog(title, message) {
   });
 }
 
-export function showConfirmDialog(
+function showConfirmDialog(
   title,
   message,
   description,
@@ -47,7 +47,7 @@ export function showConfirmDialog(
   });
 }
 
-export function showPluginInstallDialog(vaultId) {
+function showPluginInstallDialog(vaultId) {
   return new Promise((resolve) => {
     const dialog = new window.IgnisUI.PluginInstallDialog({
       target: document.body,
@@ -83,7 +83,7 @@ export function showPluginInstallDialog(vaultId) {
   });
 }
 
-export function showPromptDialog(
+function showPromptDialog(
   title,
   label,
   placeholder = "",
@@ -106,4 +106,18 @@ export function showPromptDialog(
       resolve(null);
     });
   });
+}
+
+if (typeof window !== "undefined" && window.__ignis_registerUI) {
+  window.__ignis_registerUI({
+    showVaultManager,
+    showMessageDialog,
+    showConfirmDialog,
+    showPluginInstallDialog,
+    showPromptDialog,
+  });
+} else if (typeof window !== "undefined") {
+  console.warn(
+    "[ignis] __ignis_registerUI not available; UI handlers not registered",
+  );
 }

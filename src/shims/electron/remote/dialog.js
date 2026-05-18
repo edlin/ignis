@@ -2,7 +2,7 @@ import {
   showMessageDialog,
   showConfirmDialog,
   showPromptDialog,
-} from "../../../ui/bootstrap.js";
+} from "../../ui-registry.js";
 import { inputCacheSet, inputCacheDelete } from "../../fs/input-cache.js";
 
 const IMPORTS_DIR = ".obsidian/imports";

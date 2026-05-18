@@ -1,4 +1,4 @@
-import { showVaultManager } from "../../ui/bootstrap.js";
+import { showVaultManager } from "../ui-registry.js";
 import { vaultService } from "../../services/vault-service.js";
 
 const listeners = new Map();
