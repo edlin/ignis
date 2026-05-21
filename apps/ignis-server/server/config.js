@@ -1,12 +1,14 @@
 const path = require("path");
 const fs = require("fs");
 
+const REPO_ROOT = path.join(__dirname, "..", "..", "..");
+
 // VAULT_ROOT: a directory that contains vault folders.
 // Each subdirectory is a vault. New vaults are created as new subdirs.
 const vaultRoot =
-  process.env.VAULT_ROOT || path.join(__dirname, "..", "vaults");
+  process.env.VAULT_ROOT || path.join(REPO_ROOT, "vaults");
 
-const dataRoot = process.env.DATA_ROOT || path.join(__dirname, "..", "data");
+const dataRoot = process.env.DATA_ROOT || path.join(REPO_ROOT, "data");
 
 // Ensure required directories exist
 try {
@@ -91,7 +93,7 @@ module.exports = {
 
   obsidianAssetsPath:
     process.env.OBSIDIAN_ASSETS_PATH ||
-    path.join(__dirname, "..", "investigation", "obsidian_1.12.7_unpacked"),
+    path.join(REPO_ROOT, "investigation", "obsidian_1.12.7_unpacked"),
 
   get obsidianVersion() {
     const assetsPath =

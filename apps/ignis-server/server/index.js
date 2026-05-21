@@ -12,6 +12,8 @@ writeCoalescer.configure({ writeCoalesceMs: config.writeCoalesceMs });
 const { flushAll } = writeCoalescer;
 const { setupDemo, wireDemoWebSocket } = require("./demo");
 
+const REPO_ROOT = path.join(__dirname, "..", "..", "..");
+
 const ANSI_RED = "\x1b[31m";
 const ANSI_YELLOW = "\x1b[33m";
 const ANSI_GREEN = "\x1b[32m";
@@ -139,7 +141,7 @@ app.get(["/", "/index.html"], (req, res) => {
 });
 
 app.get("/favicon.png", (req, res) => {
-  res.sendFile(path.join(__dirname, "..", "images", "favicon.png"));
+  res.sendFile(path.join(REPO_ROOT, "images", "favicon.png"));
 });
 
 // Serve dist files with cache headers based on version param
@@ -156,8 +158,8 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(express.static(path.join(__dirname, "..", "packages", "ui", "dist")));
-app.use(express.static(path.join(__dirname, "..", "packages", "shim", "dist")));
+app.use(express.static(path.join(REPO_ROOT, "packages", "ui", "dist")));
+app.use(express.static(path.join(REPO_ROOT, "packages", "shim", "dist")));
 
 app.use(express.static(config.obsidianAssetsPath));
 

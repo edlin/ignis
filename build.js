@@ -16,6 +16,8 @@ Promise.all([
     entryPoints: [
       path.join(
         __dirname,
+        "apps",
+        "ignis-server",
         "server",
         "plugins",
         "headless-sync",
@@ -27,6 +29,8 @@ Promise.all([
     bundle: true,
     outfile: path.join(
       __dirname,
+      "apps",
+      "ignis-server",
       "server",
       "plugins",
       "headless-sync",
