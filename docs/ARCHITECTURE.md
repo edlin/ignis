@@ -43,7 +43,7 @@ The shim layer makes Obsidian think it's running in Electron. The bridge plugin 
 
 ### Loading
 
-The server serves its own `index.html` (in `server/assets/`) rather than Obsidian's. At startup it reads Obsidian's `index.html` once to discover which scripts Obsidian expects, then embeds that list in our HTML as a JSON array. The client-side HTML loads the shim loader and UI bundle first (non-deferred), then a small inline script dynamically injects Obsidian's scripts in order. Obsidian's files are never modified on disk, or transformed in transit.
+The server serves its own `index.html` (in `apps/ignis-server/server/assets/`) rather than Obsidian's. At startup it reads Obsidian's `index.html` once to discover which scripts Obsidian expects, then embeds that list in our HTML as a JSON array. The client-side HTML loads the shim loader and UI bundle first (non-deferred), then a small inline script dynamically injects Obsidian's scripts in order. Obsidian's files are never modified on disk, or transformed in transit.
 
 Before injecting Obsidian's scripts, the shim loader sets `localStorage.EmulateMobile` based on viewport width (< 600px) so Obsidian boots into its mobile UI on phones and narrow windows. The loader replaces the module system, then issues a single blocking bootstrap request that returns the vault info, vault list, metadata tree, and Ignis plugin list in one pre-compressed response. The request has to be blocking because Obsidian makes synchronous filesystem calls during page load, before the event loop is running, so the cache has to already be populated.
 
@@ -77,11 +77,11 @@ Two caches on the client side. The **MetadataCache** holds `{ type, size, mtime,
 
 Reads not satisfied by ContentCache go through the transport layer to `/api/fs/readFile`. Sync calls use synchronous XHR to keep Obsidian's pre-boot module code working. Async calls use fetch. The transport handles vault id injection, base64 encoding for binary files, and mapping HTTP error codes back to Node errno values (`ENOENT`, `EEXIST`, `ENOTDIR`).
 
-Writes go through a server-side write coalescer (`server/write-coalescer.js`) designed for slow filesystems like rclone FUSE mounts. The first write to a path goes to disk immediately. Subsequent writes within a configurable window (default 5 seconds, `WRITE_COALESCE_MS`) are buffered and flushed when the debounce timer fires; the timer resets on each write. Buffered writes return to the HTTP client immediately with synthetic metadata so connection-pool starvation on rapid-fire writes (e.g. `workspace.json` autosaves) doesn't stall unrelated reads. Reads for pending paths serve the buffered content so clients never see stale data. All pending writes are flushed on graceful shutdown.
+Writes go through a server-side write coalescer (`packages/server-core/src/write-coalescer.js`) designed for slow filesystems like rclone FUSE mounts. The first write to a path goes to disk immediately. Subsequent writes within a configurable window (default 5 seconds, `WRITE_COALESCE_MS`) are buffered and flushed when the debounce timer fires; the timer resets on each write. Buffered writes return to the HTTP client immediately with synthetic metadata so connection-pool starvation on rapid-fire writes (e.g. `workspace.json` autosaves) doesn't stall unrelated reads. Reads for pending paths serve the buffered content so clients never see stale data. All pending writes are flushed on graceful shutdown.
 
 ### Transforms
 
-The shim has a transforms registry (`src/shims/fs/transforms.js`) for hooks applied at the public shim surface, before caches or transport see the path. Three hook types:
+The shim has a transforms registry (`packages/shim/src/fs/transforms.js`) for hooks applied at the public shim surface, before caches or transport see the path. Three hook types:
 
 - **Path resolvers** map a logical path to a physical path. Used by the workspaces shim to redirect reads and writes of `.obsidian/workspace.json` to `.obsidian/workspace.<name>.json` based on the `?workspace=` URL parameter, so each browser tab can hold a separate layout.
 - **Read transforms** post-process bytes returned by a read (cache hit or transport miss). Used to mask the Obsidian Sync setting in `core-plugins.json` when headless-sync is active for the vault, and to override the `active` field on reads of `workspaces.json` so each tab sees its own workspace as selected.
@@ -143,7 +143,7 @@ Standard community and core Obsidian plugins. Obsidian evals plugin code with it
 
 ### Bridge Plugin (ignis-bridge)
 
-An Obsidian plugin auto-installed into every vault by the server. Source lives in `plugin/`, built to `plugin/main.js`.
+An Obsidian plugin auto-installed into every vault by the server. Source lives in `packages/bridge-plugin/`, built to `packages/bridge-plugin/main.js`.
 
 It contributes:
 - **File actions**: a ribbon icon for uploading files into the current folder, and right-click menu items: Download (single file), Download as ZIP (folder), and Upload file (folder).
@@ -158,11 +158,11 @@ Not user-installable through Obsidian's plugin browser. Managed entirely by the 
 
 A basic plugin system for extending the server. Still early, the core lifecycle works but the API surface is minimal and likely to change.
 
-An Ignis plugin is a Node.js package under `server/plugins/<name>/` that exports an id, name, and a `register` function. On load it receives a context object with access to config, the WebSocket server, a file watcher, an Express router, a logger, and a persistent data directory. Plugins are enabled and disabled per vault, with state persisted in `data/plugin-config.json`.
+An Ignis plugin is a Node.js package under `apps/ignis-server/server/plugins/<name>/` that exports an id, name, and a `register` function. On load it receives a context object with access to config, the WebSocket server, a file watcher, an Express router, a logger, and a persistent data directory. Plugins are enabled and disabled per vault, with state persisted in `data/plugin-config.json`.
 
 When enabled, a plugin's Express router is mounted at `/api/ext/<pluginId>/`. A plugin can also optionally bundle an Obsidian plugin, a directory containing a standard Obsidian plugin (manifest.json, main.js) that gets auto-installed into the vault on enable and removed on disable. This bridges the server and client sides: the Ignis plugin handles server logic and routes, while the bundled Obsidian plugin provides the in-app UI or behavior.
 
-The one Ignis plugin currently in the repo is **headless-sync** (`server/plugins/headless-sync/`). It wraps the [obsidian-headless](https://github.com/Yuri-Khomyakov/obsidian-headless) CLI (`ob`) and runs `ob sync --continuous` as a per-vault child process, optionally with `--pull-only` or `--mirror-remote`. Process state (running/stopped/error, pid, last activity, recent log lines) is broadcast over the WebSocket via a small per-vault subscription protocol. The bundled Obsidian plugin (`ignis-headless-sync`) adds a status bar item, a settings tab with start/stop/unlink controls, and a core-sync guard that hides Obsidian's own Sync setting from `core-plugins.json` reads while headless sync is active for that vault, so a different device syncing the "Active core plugins list" can't accidentally re-enable it.
+The one Ignis plugin currently in the repo is **headless-sync** (`apps/ignis-server/server/plugins/headless-sync/`). It wraps the [obsidian-headless](https://github.com/Yuri-Khomyakov/obsidian-headless) CLI (`ob`) and runs `ob sync --continuous` as a per-vault child process, optionally with `--pull-only` or `--mirror-remote`. Process state (running/stopped/error, pid, last activity, recent log lines) is broadcast over the WebSocket via a small per-vault subscription protocol. The bundled Obsidian plugin (`ignis-headless-sync`) adds a status bar item, a settings tab with start/stop/unlink controls, and a core-sync guard that hides Obsidian's own Sync setting from `core-plugins.json` reads while headless sync is active for that vault, so a different device syncing the "Active core plugins list" can't accidentally re-enable it.
 
 ## Demo mode
 
@@ -179,4 +179,4 @@ Other demo behaviors:
 - Server-side plugins (e.g. headless-sync) hidden from the client; enable/disable returns 403.
 - The bridge plugin disables any `<input type="email">` or `<input type="password">` it sees anywhere in the document, with a placeholder telling users not to enter credentials.
 
-All server-side demo code lives in `server/demo/`. The client-side hooks live in `src/shims/demo.js`. The deployment example is in `examples/demo/` (tmpfs-mounted vaults, restricted proxy, all the env vars).
+All server-side demo code lives in `apps/ignis-server/server/demo/`. The client-side hooks live in `packages/shim/src/demo.js`. The deployment example is in `apps/ignis-server/examples/demo/` (tmpfs-mounted vaults, restricted proxy, all the env vars).

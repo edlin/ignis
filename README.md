@@ -28,6 +28,15 @@ What started as an experiment turned out to be more viable than expected, and th
 
 Plugin compatibility depends on what APIs a plugin uses; most plugins built on Obsidian's plugin API work, anything requiring Node native modules or `child_process` doesn't. See [What doesn't work](#what-doesnt-work) for the full list of known limitations.
 
+## Variants
+
+Ignis ships in two forms with the same in-browser experience:
+
+- **Self-hosted server** -- [`apps/ignis-server/`](apps/ignis-server/). Docker container running Express. Stable, in daily use. See its README for setup, env vars, and reverse-proxy examples.
+- **Desktop plugin** -- `apps/ignis-local/`. Planned.
+
+The rest of this README describes the shared experience.
+
 ## What works
 
 - All core editor features: markdown, canvas, bases, and the command palette.
@@ -95,90 +104,6 @@ A few design decisions worth knowing about for someone evaluating Ignis against 
 ## Browser compatibility
 
 Tested in Chrome, Brave, and Firefox, with limited testing in Safari.
-
-## Authentication
-
-Ignis has **no built-in authentication** and serves plain HTTP by default. Both authentication and TLS termination are expected to be handled by whatever you put in front of it.
-
-If you are exposing Ignis to the internet, **you should really** put an authentication layer in front of it. Options include:
-
-- A reverse proxy with Basic Auth (nginx, Caddy, Traefik)
-- An SSO proxy like Authelia, Authentik, or OAuth2 Proxy
-- A VPN (Tailscale, WireGuard)
-- Cloudflare Application Tunnel
-
-Example for Basic Auth, and Authelia can be found [here](examples).
-
-> [!CAUTION]
-> Do not run Ignis on a public network without auth. Anyone with the url can read and write your vault files.
-
-
-
-## Setup with Docker Compose
-
-Example `docker-compose.yml`:
-
-```yaml
-services:
-  ignis:
-    image: nobbe/ignis:latest
-    ports:
-      - "8080:8080"
-    environment:
-      - OBSIDIAN_VERSION=1.12.7
-      - PUID=1000
-      - PGID=1000
-    volumes:
-      - ./vaults:/vaults
-      - ./data:/app/data
-      - obsidian-app:/app/obsidian-app
-    restart: unless-stopped
-
-volumes:
-  obsidian-app:
-```
-
-Then `docker compose up -d`. On first start the container downloads Obsidian from the official source and installs Obsidian Headless CLI. This takes a minute or two.
-
-To build from source instead of pulling the image, clone the repo and replace `image: nobbe/ignis:latest` with `build: .`.
-
-### Volumes
-
-| Mount | Description |
-| ----- | ----------- |
-| `/vaults` | Vault storage. Each subdirectory is a vault. |
-| `/data` | state persistence for various ignis specific functionality, plugin management, headless sync config, etc |
-| `/app/obsidian-app` | Cached Obsidian assets. Persisting this avoids re-downloading on container recreate. |
-
-### Environment Variables
-
-| Variable | Description | Default |
-| -------- | ----------- | ------- |
-| `PORT` | Server listen port | `8080` |
-| `VAULT_ROOT` | Path to vault storage inside the container | `/vaults` |
-| `DATA_ROOT` | Path to persistent data (plugin config, sync state, auth tokens) | `/app/data` |
-| `OBSIDIAN_VERSION` | Obsidian version to download | `1.12.7` |
-| `OBSIDIAN_ASSETS_PATH` | Where the extracted Obsidian app files live. Override if you're pointing at a pre-extracted directory instead of letting the entrypoint download. | `/app/obsidian-app` |
-| `AUTO_CREATE_DEFAULT` | When `true`, creates a "My Vault" vault on startup if no vaults exist. Useful for fresh installs. | `false` |
-| `PUID` | User ID for file ownership | `1000` |
-| `PGID` | Group ID for file ownership | `1000` |
-| `WRITE_COALESCE_MS` | Debounce window (ms) for rapid writes. Useful for slow filesystems (rclone, NFS, SMB). Set to `0` to disable. | `5000` |
-
-Demo mode adds its own set of env vars (per-session vaults, auto-cleanup, proxy allowlist, login blocking). See [examples/demo/](examples/demo/) if you want to run a public demo deployment.
-
-### Migrating an existing vault
-
-Each subdirectory of `/vaults` is treated as a separate vault, so dropping in an existing Obsidian vault directory will make it available in Ignis.
-
-### Upgrading Obsidian
-
-Obsidian releases can include changes that break the compatibility shim. Each Ignis release pins a known-working Obsidian version through the `OBSIDIAN_VERSION` env var, so the recommended path is to wait for an Ignis release that bumps the version, pull the new image, and restart.
-
-If you want to try a newer Obsidian version before Ignis updates, set `OBSIDIAN_VERSION` in your compose file. The entrypoint will download that version on next start, but there's no guarantee it'll work cleanly with the current shim.
-
-### Backups
-
-Vault data lives as ordinary files in `/vaults`. Back it up however you back up other server-side data; Ignis doesn't provide a built in backup mechanism.
 
 ## Contributing
 
