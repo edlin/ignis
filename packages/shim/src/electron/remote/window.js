@@ -1,3 +1,5 @@
+import { getClipboard } from "./native-clipboard.js";
+
 const currentWindowState = {
   title: "Obsidian",
   isMaximized: false,
@@ -196,7 +198,13 @@ const currentWebContents = {
     document.execCommand("copy");
   },
   paste() {
-    navigator.clipboard
+    const clip = getClipboard();
+
+    if (!clip) {
+      return;
+    }
+
+    clip
       .read()
       .then(async (items) => {
         const dt = new DataTransfer();
@@ -233,7 +241,13 @@ const currentWebContents = {
       });
   },
   pasteAndMatchStyle() {
-    navigator.clipboard
+    const clip = getClipboard();
+
+    if (!clip) {
+      return;
+    }
+
+    clip
       .read()
       .then(async (items) => {
         for (const item of items) {

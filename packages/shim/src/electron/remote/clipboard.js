@@ -1,10 +1,18 @@
+import { getClipboard } from "./native-clipboard.js";
+
 export const clipboardShim = {
   readText() {
     return "";
   },
 
   writeText(text) {
-    navigator.clipboard.writeText(text).catch((e) => {
+    const clip = getClipboard();
+
+    if (!clip) {
+      return;
+    }
+
+    clip.writeText(text).catch((e) => {
       console.warn("[shim:clipboard] writeText failed:", e);
     });
   },
@@ -14,7 +22,13 @@ export const clipboardShim = {
   },
 
   writeHTML(html) {
-    navigator.clipboard
+    const clip = getClipboard();
+
+    if (!clip) {
+      return;
+    }
+
+    clip
       .write([
         new ClipboardItem({
           "text/html": new Blob([html], { type: "text/html" }),
@@ -35,6 +49,12 @@ export const clipboardShim = {
       return;
     }
 
+    const clip = getClipboard();
+
+    if (!clip) {
+      return;
+    }
+
     const pngData = image.toPNG();
 
     if (!pngData || pngData.length === 0) {
@@ -43,11 +63,9 @@ export const clipboardShim = {
 
     const blob = new Blob([pngData], { type: "image/png" });
 
-    navigator.clipboard
-      .write([new ClipboardItem({ "image/png": blob })])
-      .catch((e) => {
-        console.warn("[shim:clipboard] writeImage failed:", e);
-      });
+    clip.write([new ClipboardItem({ "image/png": blob })]).catch((e) => {
+      console.warn("[shim:clipboard] writeImage failed:", e);
+    });
   },
 
   has(format) {
@@ -59,6 +77,12 @@ export const clipboardShim = {
   },
 
   clear() {
-    navigator.clipboard.writeText("").catch(() => {});
+    const clip = getClipboard();
+
+    if (!clip) {
+      return;
+    }
+
+    clip.writeText("").catch(() => {});
   },
 };

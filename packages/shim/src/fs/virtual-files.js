@@ -1,13 +1,17 @@
 // Virtual plugin source served from memory; the fs shim's read path checks here before disk.
 
-function normalize(p) {
-  return (p || "").replace(/\\/g, "/").replace(/^\/+/, "").replace(/\/+$/, "");
-}
+import { normalize } from "../util/path.js";
 
 const virtualFiles = new Map();
 
 export function setVirtualFile(path, content) {
-  virtualFiles.set(normalize(path), content);
+  const normalized = normalize(path);
+
+  if (normalized.split("/").includes("..")) {
+    throw new Error(`virtual file path may not contain '..': ${path}`);
+  }
+
+  virtualFiles.set(normalized, content);
 }
 
 export function removeVirtualFile(path) {
