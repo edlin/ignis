@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.8.4] - Karm (2026-06-03)
+
+### Fixed
+
+- Codeblocks calling clipboard APIs no longer causes reccursion error.
+
+### Security
+
+- Hardened same-origin checks, virtual-plugin URL validation, token file permissions, and log line bounds.
+
 ## [0.8.3] - Karm (2026-06-01)
 
 ### Added
