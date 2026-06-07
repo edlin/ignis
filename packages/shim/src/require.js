@@ -11,6 +11,9 @@ import * as netShim from "./node/net.js";
 import * as httpShim from "./node/http.js";
 import * as zlibShim from "./node/zlib.js";
 import * as utilShim from "./node/util.js";
+import { constantsShim } from "./node/constants.js";
+import { assertShim } from "./node/assert.js";
+import * as streamShim from "./node/stream.js";
 import { wrapWithProxy, installDebugHelpers } from "./debug.js";
 
 const rawRegistry = {
@@ -29,6 +32,9 @@ const rawRegistry = {
   https: httpShim,
   zlib: zlibShim,
   util: utilShim,
+  constants: constantsShim,
+  assert: assertShim,
+  stream: streamShim,
 };
 
 const shimRegistry = {};

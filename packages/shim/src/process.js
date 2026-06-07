@@ -1,5 +1,6 @@
 export const processShim = {
   platform: "linux",
+  version: "v18.18.0",
   versions: {
     electron: "28.2.3",
     node: "18.18.0",

@@ -180,5 +180,147 @@ export function createFsSync(metadataCache, contentCache, transport) {
       const entries = metadataCache.readdir(path);
       return entries.map((e) => e.name);
     },
+
+    lstatSync(path) {
+      // No symlinks in our context.
+      return this.statSync(path);
+    },
+
+    mkdirSync(path, options) {
+      const recursive =
+        typeof options === "object" ? !!options.recursive : !!options;
+
+      markLocalOp(path);
+      metadataCache.set(path, { type: "directory" });
+
+      transport.mkdir(path, recursive).catch((e) => {
+        console.error("[shim:fs] mkdirSync background create failed:", path, e);
+      });
+    },
+
+    rmdirSync(path) {
+      markLocalOp(path);
+      metadataCache.delete(path);
+
+      transport.rmdir(path).catch((e) => {
+        console.error("[shim:fs] rmdirSync background remove failed:", path, e);
+      });
+    },
+
+    rmSync(path, options) {
+      const recursive =
+        typeof options === "object" ? !!options.recursive : false;
+
+      const resolved = resolvePath(path);
+
+      markLocalOp(resolved);
+      metadataCache.delete(resolved);
+      contentCache.delete(resolved);
+
+      transport.rm(resolved, recursive).catch((e) => {
+        console.error(
+          "[shim:fs] rmSync background remove failed:",
+          resolved,
+          e,
+        );
+      });
+    },
+
+    renameSync(oldPath, newPath) {
+      const resolvedOld = resolvePath(oldPath);
+      const resolvedNew = resolvePath(newPath);
+
+      markLocalOp(resolvedOld);
+      markLocalOp(resolvedNew);
+      const content = contentCache.get(resolvedOld);
+
+      if (content !== null) {
+        contentCache.set(resolvedNew, content);
+        contentCache.delete(resolvedOld);
+      }
+
+      metadataCache.rename(resolvedOld, resolvedNew);
+
+      transport.rename(resolvedOld, resolvedNew).catch((e) => {
+        console.error(
+          "[shim:fs] renameSync background rename failed:",
+          resolvedOld,
+          e,
+        );
+      });
+    },
+
+    copyFileSync(src, dest) {
+      const resolvedSrc = resolvePath(src);
+      const resolvedDest = resolvePath(dest);
+
+      markLocalOp(resolvedDest);
+
+      // Optimistically mirror the source so a sync read right after sees it.
+      const content = contentCache.get(resolvedSrc);
+
+      if (content !== null) {
+        contentCache.set(resolvedDest, content);
+      }
+
+      const srcMeta = metadataCache.get(resolvedSrc);
+
+      if (srcMeta) {
+        metadataCache.set(resolvedDest, { ...srcMeta });
+      }
+
+      transport
+        .copyFile(src, resolvedDest)
+        .then(() => transport.stat(resolvedDest))
+        .then((meta) => metadataCache.set(resolvedDest, meta))
+        .catch((e) => {
+          console.error(
+            "[shim:fs] copyFileSync background copy failed:",
+            resolvedDest,
+            e,
+          );
+        });
+    },
+
+    appendFileSync(path, data) {
+      const resolved = resolvePath(path);
+
+      markLocalOp(resolved);
+      contentCache.invalidate(resolved);
+
+      transport
+        .appendFile(resolved, data)
+        .then(() => transport.stat(resolved))
+        .then((meta) => metadataCache.set(resolved, meta))
+        .catch((e) => {
+          console.error(
+            "[shim:fs] appendFileSync background append failed:",
+            resolved,
+            e,
+          );
+        });
+    },
+
+    utimesSync(path, atime, mtime) {
+      const resolved = resolvePath(path);
+      const meta = metadataCache.get(resolved);
+
+      if (meta) {
+        meta.mtime = typeof mtime === "number" ? mtime : mtime.getTime();
+        metadataCache.set(resolved, meta);
+      }
+
+      transport.utimes(resolved, atime, mtime).catch((e) => {
+        console.error(
+          "[shim:fs] utimesSync background utimes failed:",
+          resolved,
+          e,
+        );
+      });
+    },
+
+    chmodSync() {
+      // The vault FS does not model permission bits. No-op.
+    },
   };
 }

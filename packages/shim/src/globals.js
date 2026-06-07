@@ -228,7 +228,12 @@ function installContextMenuFix() {
   );
 }
 
+function installGlobalAlias() {
+  window.global = window;
+}
+
 export function installGlobals() {
+  installGlobalAlias();
   installProcess();
   installBuffer();
   installFetchShim();

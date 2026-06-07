@@ -1,6 +1,10 @@
 import { markLocalOp } from "./echo-guard.js";
 import { isInputCachePath, inputCacheGet } from "./input-cache.js";
-import { applyReadTransform, applyWriteTransform, resolvePath } from "./transforms.js";
+import {
+  applyReadTransform,
+  applyWriteTransform,
+  resolvePath,
+} from "./transforms.js";
 import { hasVirtualFile, getVirtualFile } from "./virtual-files.js";
 
 export function createFsPromises(metadataCache, contentCache, transport) {
@@ -268,6 +272,10 @@ export function createFsPromises(metadataCache, contentCache, transport) {
         meta.mtime = typeof mtime === "number" ? mtime : mtime.getTime();
         metadataCache.set(resolved, meta);
       }
+    },
+
+    async chmod() {
+      // No permission bits in the vault FS. No-op.
     },
 
     async open(path, flags) {
