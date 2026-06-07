@@ -28,6 +28,8 @@ Example configurations for Basic Auth and Authelia are in [`examples/`](examples
 > [!CAUTION]
 > Do not run Ignis on a public network without auth. Anyone with the URL can read and write your vault files.
 
+Ignis also runs a cross-origin proxy (`/api/proxy`) that reaches any public host by default. It rejects private, loopback, and link-local addresses, and you can narrow it to an allowlist or disable it entirely from the proxy settings in the Ignis settings panel.
+
 ## Setup with Docker Compose
 
 Example `docker-compose.yml`:

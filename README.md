@@ -74,12 +74,12 @@ Compatibility for specific community plugins is tracked in [Issue #9](https://gi
 **Server-side integration.** 
 - Adds a plugin system inside the server itself, separate from Obsidian's community plugin system (WIP).
 - Ignis-specific settings appear as their own tabs inside Obsidian's Settings modal.
+- Server runtime settings (cache sizes, request body limit, etc.) are configurable from the Ignis settings panel.
 - Status bar indicators surface server state and headless sync activity.
 
 ## Roadmap
 
 **Planned:**
-- Server parameter configuration from the Ignis settings panel (LRU cache size, write coalesce window, etc.)
 - Continued shim work to support more community plugins.
 - Server-side plugin system improvements.
 
@@ -94,7 +94,7 @@ A few design decisions worth knowing about for someone evaluating Ignis against 
 - A pre-compressed bootstrap response delivers vault info, vault list, metadata tree, and plugin list in a single call.
 - Indexer pre-fetch warms the content cache so Obsidian's startup index hits cache instead of the network.
 - An LRU content cache (50 MB by default) keeps memory use bounded regardless of vault size, so Ignis doesn't hold the whole vault in memory.
-- Write coalescing debounces rapid writes for slow filesystems (rclone, FUSE, NFS, SMB).
+- Optional write coalescing debounces rapid writes for slow filesystems (rclone, FUSE, NFS, SMB); off unless `WRITE_COALESCE_MS` is set.
 
 ## Browser compatibility
 

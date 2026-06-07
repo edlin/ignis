@@ -69,6 +69,9 @@ Immediately after the bootstrap response is applied, the client kicks off a batc
 | `net`                | All classes/functions throw.                                                                    |
 | `http` / `https`     | Module is importable but `request()`/`get()` emit an `error` event; `createServer` throws. Plugins should use `requestUrl` or `fetch` (the shim routes cross-origin `fetch` through the server proxy). |
 | `buffer`             | Aliased to the browser `Buffer` polyfill set up by the loader.                                  |
+| `assert`             | Standard assertions: `assert`, `equal`, `strictEqual`, `deepEqual`, `throws`. |
+| `constants`          | File access and mode constants (`F_OK`, `O_RDONLY`, `S_IFMT`, etc.) for the reported Linux platform. |
+| `stream`             | Base classes (`Stream`, `Readable`, `Writable`, `Duplex`, `Transform`, `PassThrough`) extending EventEmitter. Data-flow methods warn and do nothing. |
 
 Unknown modules return an empty proxy and log a warning. The `node:` prefix is stripped. The shim exposes two console helpers, `window.__shimLog()` (everything that has been accessed) and `window.__shimMisses()` (accessed-but-missing properties).
 
@@ -78,7 +81,7 @@ Two caches on the client side. The **MetadataCache** holds `{ type, size, mtime,
 
 Reads not satisfied by ContentCache go through the transport layer to `/api/fs/readFile`. Sync calls use synchronous XHR to keep Obsidian's pre-boot module code working. Async calls use fetch. The transport handles vault id injection, base64 encoding for binary files, and mapping HTTP error codes back to Node errno values (`ENOENT`, `EEXIST`, `ENOTDIR`).
 
-Writes go through a server-side write coalescer (`packages/server-core/src/write-coalescer.js`) designed for slow filesystems like rclone FUSE mounts. The first write to a path goes to disk immediately. Subsequent writes within a configurable window (default 5 seconds, `WRITE_COALESCE_MS`) are buffered and flushed when the debounce timer fires; the timer resets on each write. Buffered writes return to the HTTP client immediately with synthetic metadata so connection-pool starvation on rapid-fire writes (e.g. `workspace.json` autosaves) doesn't stall unrelated reads. Reads for pending paths serve the buffered content so clients never see stale data. All pending writes are flushed on graceful shutdown.
+Writes go through a server-side write coalescer (`packages/server-core/src/write-coalescer.js`) designed for slow filesystems like rclone FUSE mounts. The first write to a path goes to disk immediately. Subsequent writes within a configurable window (`WRITE_COALESCE_MS`, default `0` which disables coalescing) are buffered and flushed when the debounce timer fires; the timer resets on each write. Buffered writes return to the HTTP client immediately with synthetic metadata so connection-pool starvation on rapid-fire writes (e.g. `workspace.json` autosaves) doesn't stall unrelated reads. Reads for pending paths serve the buffered content so clients never see stale data. All pending writes are flushed on graceful shutdown.
 
 ### Transforms
 
@@ -102,7 +105,7 @@ Obsidian on the desktop can make arbitrary cross-origin HTTP requests because it
 
 The shim handles this transparently. `window.fetch` and `window.requestUrl` are intercepted. Same-origin requests pass through unchanged. Cross-origin requests are POSTed to `/api/proxy`, which performs the outbound call from the server with headers that mimic Obsidian's desktop runtime: `Origin: app://obsidian.md` and the browser's own User-Agent. The response body is returned base64-encoded so binary content survives the JSON round-trip; the shim decodes it and hands the caller a normal `Response` or `requestUrl` result.
 
-The proxy itself is intentionally generic. It forwards method, headers, and body verbatim and returns whatever the upstream sent. In demo mode, an allowlist restricts the hostname to a known-safe set; in normal self-hosted mode there's no restriction, which is one of the reasons the server needs to be behind authentication when exposed to the internet.
+The proxy itself is intentionally generic. It forwards method, headers, and body verbatim and returns whatever the upstream sent. It always rejects requests whose hostname resolves to a private, loopback, or link-local address (SSRF guard). Outbound access is governed by `proxyMode`: `any` (the default) reaches any public host, `allowlist` restricts to a configured host list, and `disabled` blocks all proxying; demo mode pins it to `allowlist`. Under the default `any`, the proxy is an open relay to public hosts, which is one of the reasons the server needs to be behind authentication when exposed to the internet.
 
 ### Workspaces in browser tabs
 
@@ -138,6 +141,7 @@ An Express server that handles filesystem operations, vault management, static f
 - `/api/bootstrap` - one-shot cold-start endpoint; returns vault info + list + metadata tree + plugin list as a single pre-compressed response, cached per vault with mtime-based invalidation.
 - `/api/proxy` - cross-origin HTTP proxy used by the fetch and requestUrl shims.
 - `/api/version` - Ignis version (SemVer), per-build identifier, and pinned Obsidian version.
+- `/api/settings/*` - read and update runtime server settings (cache sizes, request body limit, write-coalesce window, proxy mode and allowlist).
 - `/api/plugins/*` - Ignis plugin management (list, enable, disable). __WIP__
 - `/api/ext/:pluginId/*` - routes registered by individual Ignis plugins.
 - `/vault-files/<vaultId>/<path>` - static file serving rooted at a vault, used by Obsidian for image/attachment resource URLs.
