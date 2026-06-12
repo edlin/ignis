@@ -392,22 +392,6 @@ router.get("/access", async (req, res) => {
   }
 });
 
-router.get("/realpath", async (req, res) => {
-  const resolved = guardPath(req, res);
-
-  if (!resolved) {
-    return;
-  }
-
-  try {
-    const real = await fs.promises.realpath(resolved);
-
-    res.json({ path: path.relative(req._vaultRoot, real) });
-  } catch (e) {
-    res.status(500).json({ error: e.code || "internal", code: e.code });
-  }
-});
-
 // POST /api/fs/utimes { path, atime, mtime, vault? }
 router.post("/utimes", async (req, res) => {
   const resolved = guardPath(req, res, "body");
