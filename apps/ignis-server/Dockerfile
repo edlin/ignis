@@ -59,15 +59,15 @@ COPY --from=build /app/apps/ignis-server/server/plugins/headless-sync/obsidian/d
 RUN chmod +x /app/apps/ignis-server/scripts/entrypoint.sh
 
 ENV PORT=8080
-ENV VAULT_ROOT=/vaults
+ENV VAULT_ROOT=/data/vaults
 ENV OBSIDIAN_VERSION=1.12.7
-ENV OBSIDIAN_ASSETS_PATH=/app/obsidian-app
+ENV OBSIDIAN_ASSETS_PATH=/data/obsidian-app
 ENV PUID=1000
 ENV PGID=1000
 
 EXPOSE 8080
 
-VOLUME /vaults
-VOLUME /app/obsidian-app
+VOLUME /data
+# VOLUME /app/obsidian-app
 
 ENTRYPOINT ["/app/apps/ignis-server/scripts/entrypoint.sh"]
