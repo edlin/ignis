@@ -3,7 +3,9 @@
 # Copies workspace package.jsons first for cache-friendly npm ci.
 FROM node:22-slim AS build
 
-WORKDIR /app
+ARG APP_DIR=/data/app
+
+WORKDIR ${APP_DIR}
 
 COPY package.json package-lock.json ./
 COPY packages/services/package.json ./packages/services/
@@ -31,7 +33,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   ca-certificates curl gosu \
   && rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app
+WORKDIR ${APP_DIR}
 
 # Workspace package.jsons + lockfile so npm ci sets up the @ignis/* symlinks.
 COPY package.json package-lock.json ./
@@ -51,17 +53,17 @@ COPY images/ ./images/
 COPY packages/server-core/src/ ./packages/server-core/src/
 
 # Built artifacts from the build stage.
-COPY --from=build /app/packages/shim/dist/shim-loader.js ./packages/shim/dist/shim-loader.js
-COPY --from=build /app/packages/ui/dist/ignis-ui.js ./packages/ui/dist/ignis-ui.js
-COPY --from=build /app/apps/ignis-server/server/build-info.json ./apps/ignis-server/server/build-info.json
-COPY --from=build /app/apps/ignis-server/server/plugins/headless-sync/obsidian/dist/ ./apps/ignis-server/server/plugins/headless-sync/obsidian/dist/
+COPY --from=build ${APP_DIR}/packages/shim/dist/shim-loader.js ./packages/shim/dist/shim-loader.js
+COPY --from=build ${APP_DIR}/packages/ui/dist/ignis-ui.js ./packages/ui/dist/ignis-ui.js
+COPY --from=build ${APP_DIR}/apps/ignis-server/server/build-info.json ./apps/ignis-server/server/build-info.json
+COPY --from=build ${APP_DIR}/apps/ignis-server/server/plugins/headless-sync/obsidian/dist/ ./apps/ignis-server/server/plugins/headless-sync/obsidian/dist/
 
-RUN chmod +x /app/apps/ignis-server/scripts/entrypoint.sh
+RUN chmod +x ${APP_DIR}/apps/ignis-server/scripts/entrypoint.sh
 
 ENV PORT=8080
 ENV VAULT_ROOT=/data/vaults
 ENV OBSIDIAN_VERSION=1.12.7
-ENV OBSIDIAN_ASSETS_PATH=/data/obsidian-app
+ENV OBSIDIAN_ASSETS_PATH=/data/app/obsidian-app
 ENV PUID=1000
 ENV PGID=1000
 
@@ -70,4 +72,4 @@ EXPOSE 8080
 VOLUME /data
 # VOLUME /app/obsidian-app
 
-ENTRYPOINT ["/app/apps/ignis-server/scripts/entrypoint.sh"]
+ENTRYPOINT ["${APP_DIR}/apps/ignis-server/scripts/entrypoint.sh"]
