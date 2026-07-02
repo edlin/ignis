@@ -16,7 +16,7 @@ primary_region = 'ewr'
 
 [[mounts]]
   source = 'ednis_data'
-  destination = '/'
+  destination = '/data'
 
 [http_service]
   internal_port = 8080
