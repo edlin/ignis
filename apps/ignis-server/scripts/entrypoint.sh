@@ -25,6 +25,8 @@ fi
 
 
 mkdir -p /app/data
+mkdir -p /data/vaults
+mkdir -p /data/obsidian-app
 chown -R "$PUID:$PGID" /data/vaults /data/obsidian-app /app/data
 
 OBSIDIAN_DIR="/app/obsidian-app"
