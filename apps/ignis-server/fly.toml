@@ -10,7 +10,7 @@ primary_region = 'ewr'
   dockerfile = 'Dockerfile'
 
 [env]
-  OBSIDIAN_ASSETS_PATH = '/data/obsidian-app'
+  OBSIDIAN_ASSETS_PATH = '/data/app/obsidian-app'
   PORT = '8080'
   VAULT_ROOT = '/data/vaults'
 
