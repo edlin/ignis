@@ -1,4 +1,4 @@
-app = "ignis-server"
+app = "ednis"
 primary_region = "ewr"
 
 [build]
@@ -18,7 +18,7 @@ primary_region = "ewr"
 
 [mounts]
   # The name of the volume we will create in the CLI
-  source = "ignis_data"
+  source = "ednis_data"
   destination = "/data"
 
 [http_service]
