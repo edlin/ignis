@@ -1,0 +1,30 @@
+app = "ignis-server"
+primary_region = "ewr"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  # The absolute minimum RAM. Costs ~$1.94/mo.
+  memory = "256mb"
+
+[env]
+  PORT = "8080"
+  # Override the Dockerfile defaults to point inside the single Fly volume
+  VAULT_ROOT = "/data/vaults"
+  OBSIDIAN_ASSETS_PATH = "/data/obsidian-app"
+
+[mounts]
+  # The name of the volume we will create in the CLI
+  source = "ignis_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  # Set to false so the server doesn't spin down and interrupt background syncing
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
