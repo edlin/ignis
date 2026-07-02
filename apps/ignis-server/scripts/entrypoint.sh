@@ -25,7 +25,7 @@ fi
 
 
 mkdir -p /app/data
-chown -R "$PUID:$PGID" /vaults /app/obsidian-app /app/data
+chown -R "$PUID:$PGID" /data/vaults /data/obsidian-app /app/data
 
 OBSIDIAN_DIR="/app/obsidian-app"
 OBSIDIAN_VERSION="${OBSIDIAN_VERSION:-1.12.7}"
