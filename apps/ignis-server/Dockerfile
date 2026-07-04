@@ -33,6 +33,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   ca-certificates curl gosu \
   && rm -rf /var/lib/apt/lists/*
 
+ARG APP_DIR=/data/app
 WORKDIR ${APP_DIR}
 
 # Workspace package.jsons + lockfile so npm ci sets up the @ignis/* symlinks.
@@ -72,4 +73,4 @@ EXPOSE 8080
 VOLUME /data
 # VOLUME /app/obsidian-app
 
-ENTRYPOINT ["${APP_DIR}/apps/ignis-server/scripts/entrypoint.sh"]
+ENTRYPOINT ["/data/app/apps/ignis-server/scripts/entrypoint.sh"]
