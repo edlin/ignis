@@ -10,13 +10,13 @@ primary_region = 'ewr'
   dockerfile = 'Dockerfile'
 
 [env]
-  OBSIDIAN_ASSETS_PATH = '/data/app/obsidian-app'
+  OBSIDIAN_ASSETS_PATH = '/app/obsidian-app'
   PORT = '8080'
-  VAULT_ROOT = '/data/vaults'
+  VAULT_ROOT = '/app/obsidian-app/vaults'
 
 [[mounts]]
   source = 'ednis_data'
-  destination = '/data'
+  destination = '/app/obsidian-app'
 
 [http_service]
   internal_port = 8080
