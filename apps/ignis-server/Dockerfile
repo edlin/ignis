@@ -3,9 +3,7 @@
 # Copies workspace package.jsons first for cache-friendly npm ci.
 FROM node:22-slim AS build
 
-ARG APP_DIR=/data/app
-
-WORKDIR ${APP_DIR}
+WORKDIR /app
 
 COPY package.json package-lock.json ./
 COPY packages/services/package.json ./packages/services/
@@ -21,7 +19,8 @@ COPY build.js ./
 COPY packages/ ./packages/
 COPY apps/ignis-server/ ./apps/ignis-server/
 
-RUN npm run build
+ARG IGNIS_BUILD
+RUN IGNIS_BUILD=${IGNIS_BUILD} npm run build
 
 # Production image. No Obsidian code included.
 # On first run, the entrypoint downloads Obsidian.
@@ -33,8 +32,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   ca-certificates curl gosu \
   && rm -rf /var/lib/apt/lists/*
 
-ARG APP_DIR=/data/app
-WORKDIR ${APP_DIR}
+WORKDIR /app
 
 # Workspace package.jsons + lockfile so npm ci sets up the @ignis/* symlinks.
 COPY package.json package-lock.json ./
@@ -54,23 +52,22 @@ COPY images/ ./images/
 COPY packages/server-core/src/ ./packages/server-core/src/
 
 # Built artifacts from the build stage.
-COPY --from=build ${APP_DIR}/packages/shim/dist/shim-loader.js ./packages/shim/dist/shim-loader.js
-COPY --from=build ${APP_DIR}/packages/ui/dist/ignis-ui.js ./packages/ui/dist/ignis-ui.js
-COPY --from=build ${APP_DIR}/apps/ignis-server/server/build-info.json ./apps/ignis-server/server/build-info.json
-COPY --from=build ${APP_DIR}/apps/ignis-server/server/plugins/headless-sync/obsidian/dist/ ./apps/ignis-server/server/plugins/headless-sync/obsidian/dist/
+COPY --from=build /app/packages/shim/dist/shim-loader.js ./packages/shim/dist/shim-loader.js
+COPY --from=build /app/packages/ui/dist/ignis-ui.js ./packages/ui/dist/ignis-ui.js
+COPY --from=build /app/apps/ignis-server/server/build-info.json ./apps/ignis-server/server/build-info.json
+COPY --from=build /app/apps/ignis-server/server/plugins/headless-sync/obsidian/dist/ ./apps/ignis-server/server/plugins/headless-sync/obsidian/dist/
 
-RUN chmod +x ${APP_DIR}/apps/ignis-server/scripts/entrypoint.sh
+RUN chmod +x /app/apps/ignis-server/scripts/entrypoint.sh
 
 ENV PORT=8080
-ENV VAULT_ROOT=/data/vaults
+ENV VAULT_ROOT=/app/obsidian-app/vaults
 ENV OBSIDIAN_VERSION=1.12.7
-ENV OBSIDIAN_ASSETS_PATH=/data/app/obsidian-app
+ENV OBSIDIAN_ASSETS_PATH=/app/obsidian-app
 ENV PUID=1000
 ENV PGID=1000
 
 EXPOSE 8080
 
-VOLUME /data
-# VOLUME /app/obsidian-app
+VOLUME /app/obsidian-app
 
-ENTRYPOINT ["/data/app/apps/ignis-server/scripts/entrypoint.sh"]
+ENTRYPOINT ["/app/apps/ignis-server/scripts/entrypoint.sh"]
