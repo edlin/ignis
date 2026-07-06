@@ -56,7 +56,7 @@ app.use((req, res, next) => {
   const host = req.headers.host || '';
   
   // Check if the host matches your custom domain
-  if (!host.includes(CUSTOM_DOMAIN)) {
+  if (hostname !== CUSTOM_DOMAIN) {
     // Option A: Block access completely
     return res.status(403).send('Access denied. Please use the official domain.');
     
