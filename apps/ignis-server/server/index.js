@@ -31,6 +31,8 @@ const ANSI_YELLOW = "\x1b[33m";
 const ANSI_GREEN = "\x1b[32m";
 const ANSI_RESET = "\x1b[0m";
 
+const CUSTOM_DOMAIN = 'ed237.win';
+
 const app = express();
 
 // Reject oversized requests by Content-Length before parsing.
@@ -39,6 +41,27 @@ app.use((req, res, next) => {
 
   if (Number.isFinite(declared) && declared > settings.get("maxBodyBytes")) {
     return res.status(413).json({ error: "Request body too large" });
+  }
+
+  next();
+});
+
+app.use((req, res, next) => {
+  // Allow health checks to bypass this rule
+  // This might not even be a thing.
+  if (req.path === '/healthcheck') {
+    return next();
+  }
+
+  const host = req.headers.host || '';
+  
+  // Check if the host matches your custom domain
+  if (!host.includes(CUSTOM_DOMAIN)) {
+    // Option A: Block access completely
+    return res.status(403).send('Access denied. Please use the official domain.');
+    
+    // Option B: Redirect to your custom domain (Better for SEO)
+    // return res.redirect(301, `https://${CUSTOM_DOMAIN}${req.url}`);
   }
 
   next();
